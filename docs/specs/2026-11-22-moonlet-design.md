@@ -95,7 +95,7 @@ other directly.
 | `Scheduler` | Runs the active pack. Tells `AppState` which wallpaper to show next. |
 | `AudioController` | Applies the audio rule. Plays playlists with `AVQueuePlayer`, streams with `AVPlayer`, and soundtracks with `AVQueuePlayer` plus `AVPlayerLooper`. Handles fades. |
 | `PlaybackMonitor` | Watches the Core Audio process list. Publishes `otherAudioActive: Bool` and the name of the app playing. |
-| `VisibilityMonitor` | Watches each desktop window's occlusion. Publishes a covered flag per screen. |
+| `VisibilityMonitor` | Checks window coverage and each desktop window's occlusion. Publishes a covered flag per screen. |
 
 ### 4.1 Sharing across screens
 
@@ -294,18 +294,54 @@ Music plays only when the music pause-reason set is empty.
 `PlaybackMonitor` uses the Core Audio process objects available since macOS
 14.2:
 
-- It listens to `kAudioHardwarePropertyProcessObjectList` on the system object.
+- It listens to `kAudioHardwarePropertyProcessObjectList` on the system object
+  to learn when audio processes appear and disappear.
 - For each process object, it reads `kAudioProcessPropertyPID` and
-  `kAudioProcessPropertyBundleID`, and listens to
-  `kAudioProcessPropertyIsRunningOutput`.
+  `kAudioProcessPropertyBundleID`.
+- It polls `kAudioProcessPropertyIsRunningOutput` on every process object once
+  per second. Layer 0 found that property listeners on this flag never fire on
+  macOS 27.2, while polling catches every change.
 - It ignores Moonlet's own PID, and every bundle ID in the ignore list.
 - `otherAudioActive` is true when any remaining process is running output.
+  Processes without a bundle ID, such as `afplay`, count.
+- No permission prompt is needed.
 
-The ignore list is editable in settings. It covers apps that keep the output
-open while silent.
+**Default ignore list:**
 
-The Core Audio listener callbacks run on a background queue. The monitor hops
-to the main actor before publishing.
+| Bundle ID | Why |
+|---|---|
+| `systemsoundserverd` | Plays system sounds. A single sound held the output for 3 seconds in Layer 0. |
+| `com.vorssaint.utils` | A utility app that mirrors other apps' output |
+
+The ignore list is editable in settings.
+
+**Naming the app that plays.** Browsers play audio from helper processes, so
+the monitor maps each process to a display name for the menu:
+
+1. If `NSRunningApplication(processIdentifier:)` has a name ending in
+   " Graphics and Media", strip that suffix. Safari's
+   `com.apple.WebKit.GPU` helper becomes "Safari".
+2. Otherwise, if the bundle ID ends in `.helper`, strip it and look up the app
+   with `NSRunningApplication.runningApplications(withBundleIdentifier:)`.
+   `com.google.Chrome.helper` becomes "Google Chrome".
+3. Otherwise, use the running application's name, then the bundle ID, then
+   "Another app".
+
+**Measured release times.** This is how long each app kept the output running
+after its audio stopped, in Layer 0:
+
+| App | Release time |
+|---|---|
+| Spotify | Under 1 second after pause |
+| VLC | Under 1 second after playback ends |
+| Safari | About 8 seconds after playback ends |
+| Chrome | Releases on its own. Exact delay not measured. |
+
+With the 5-second resume delay, music resumes about 13 seconds after Safari
+stops. The delays stay at 3 seconds and 5 seconds.
+
+The poll runs on a background queue. The monitor hops to the main actor before
+publishing.
 
 ### 6.6 Streams failing
 
@@ -347,19 +383,38 @@ Granularity:
 
 ### 7.3 Detecting "covered"
 
-`VisibilityMonitor` uses two signals:
+Layer 0 showed that occlusion state alone is not enough. A fullscreen app and a
+window filling the screen both left the desktop window "visible". So the
+coverage check is the main signal, and occlusion is a second one.
 
-1. **Occlusion.** It listens to `NSWindow.didChangeOcclusionStateNotification`.
-   When `occlusionState` lacks `.visible`, the screen counts as covered.
-2. **Coverage fallback.** While a screen counts as visible, it polls
-   `CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)` every 2
-   seconds. It looks at windows at layer 0 (normal app windows). If one window
-   covers at least 95% of the screen's `visibleFrame`, the screen counts as
-   covered.
+A screen counts as covered when either signal says so:
+
+1. **Coverage check.** `VisibilityMonitor` polls
+   `CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)`
+   every 2 seconds. It looks at windows at layer 0 (normal app windows) that
+   do not belong to Moonlet and have alpha above 0. If one window covers at
+   least 95% of the screen's `visibleFrame`, the screen counts as covered.
+   Layer 0 measured 100% for a fullscreen app and 98% to 100% for a window
+   filling the screen.
+2. **Occlusion.** It listens to `NSWindow.didChangeOcclusionStateNotification`.
+   When `occlusionState` lacks `.visible`, the screen counts as covered. This
+   catches the lock screen and some Space switches.
+
+Extra rules from Layer 0:
+
+- Every Space switch flips occlusion to hidden and back within about 0.2
+  seconds. The 1-second covered delay in section 7.1 filters these flips out.
+- On `NSWorkspace.activeSpaceDidChangeNotification`, the monitor runs the
+  coverage check at once, instead of waiting for the next 2-second poll.
+- CG window bounds use a top-left origin on the primary screen. The monitor
+  converts each `NSScreen.visibleFrame` before comparing.
 
 Window bounds and layers do not need Screen Recording permission.
 
-Layer 0 decides whether the fallback is needed.
+**Lock and sleep.** The `com.apple.screenIsLocked` and
+`com.apple.screenIsUnlocked` distributed notifications fired on lock and
+unlock in Layer 0. These notifications, plus the `NSWorkspace` sleep and wake
+notifications, set and clear the `system` reason.
 
 ### 7.4 Wallpaper lifecycle
 
@@ -463,8 +518,12 @@ On launch, Moonlet restores:
 - [ ] A fullscreen app pauses the visuals. Activity Monitor shows low CPU and
       GPU use.
 - [ ] A window covering the whole screen pauses the visuals.
-- [ ] Music pauses for Safari video, Spotify, and a Zoom call, and resumes
-      afterward.
+- [ ] Music pauses for Safari video, Chrome video, Spotify, Music, and VLC,
+      and resumes afterward.
+- [ ] A muted Chrome tab that is still playing: record whether it pauses the
+      music. Layer 0 did not test this.
+- [ ] The menu names the app that is playing, for example "Safari" rather than
+      "Safari Graphics and Media".
 - [ ] A notification sound does not pause the music.
 - [ ] Locking the screen and sleeping the Mac pause both music and visuals.
 - [ ] Saving a `.metal` file reloads the shader. A broken save keeps the old
@@ -512,18 +571,18 @@ checks are always on the user's try-this list.
 | 8 | Settings window | Library grid, import, ignore list, Problems, launch at login | SwiftUI views |
 | 9 | Icon and polish | The orbit icon in the menu bar and app bundle | Asset catalog |
 
-Open decisions for the Layer 1 plan:
+Tooling for Layer 1, both already installed through Homebrew:
 
-- How to create the Xcode project: XcodeGen (needs a Homebrew install), or a
-  hand-written project file.
-- Where test media comes from: generated with `ffmpeg`, or supplied by the
-  user.
+- XcodeGen generates the Xcode project from a `project.yml` file.
+- `ffmpeg` generates the test media.
+
+Layer 0 is done. Its findings are in sections 6.5 and 7.3.
 
 ## 12. Risks
 
 | Risk | Mitigation |
 |---|---|
-| Some apps keep audio output running while silent, which would pause music forever | Ignore list, plus the play-anyway override. Layer 0 measures Safari, Chrome, Spotify, Zoom, and Discord. |
-| Occlusion state misses a window that covers the whole screen | Coverage fallback in section 7.3. Layer 0 decides whether it is needed. |
+| Some apps keep audio output running while silent, which would pause music forever | Default ignore list, plus the play-anyway override. Layer 0 found Vorssaint and system sounds. Music and muted tabs were not tested, so Layer 6 checks them. Firefox is out of scope. |
+| Occlusion state misses covered windows | Confirmed in Layer 0. The coverage check in section 7.3 is the main signal. |
 | WebKit throttling in covered windows is weaker than expected | Layer 4 checks CPU use. If it is too high, `WebRenderer` hides the web view while covered. |
 | Strict concurrency friction with AVFoundation and Core Audio callbacks | Keep every callback a thin hop to the main actor. Keep the logic in testable main-actor types. |
