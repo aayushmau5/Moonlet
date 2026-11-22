@@ -256,19 +256,22 @@ persists it.
 
 ### 6.2 Switching sources
 
-When the effective source changes:
-
-1. The old source fades out over 1.5 seconds.
-2. The new source fades in over 1.5 seconds.
+When the effective source changes, the old source fades out and the new
+source fades in at the same time, over 1.5 seconds. Fading them one after the
+other would leave about 3 seconds of near silence.
 
 When the user leaves a wallpaper with a soundtrack, the playlist resumes at the
 track and position where it stopped. A stream rejoins live.
 
+Music starts only after the first wallpaper is shown, so a wallpaper with a
+soundtrack never briefly plays the playlist first. If no wallpaper is shown
+within 5 seconds, music starts anyway.
+
 ### 6.3 Video soundtracks
 
-For `"soundtrack": "video"`, `AudioController` opens the same file in its own
-audio-only player, with the video tracks disabled
-(`AVPlayerItemTrack.isEnabled = false`). Audio and visuals stay independent, so
+For `"soundtrack": "video"`, `LoopingChannel` builds an audio-only
+`AVMutableComposition` from the video file's audio track, so the video is not
+decoded a second time. Audio and visuals stay independent, so
 music continues while the visuals are paused. A small drift between the two is
 acceptable.
 
@@ -475,7 +478,11 @@ On launch, Moonlet restores:
 
 ## 8. User interface
 
-### 8.1 Menu bar
+### 8.1 Menu bar panel
+
+The menu bar icon opens a small SwiftUI panel (`MenuBarExtra` with the
+`.window` style) rather than a plain menu, because a plain menu cannot hold a
+volume slider. It contains:
 
 - Current wallpaper or pack name
 - Wallpaper picker: wallpapers and packs, grouped

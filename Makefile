@@ -21,7 +21,7 @@ snapshots: generate
 	TEST_RUNNER_MOONLET_SNAPSHOT_DIR=$(CURDIR)/build/snapshots $(XCODEBUILD) test -only-testing:MoonletTests/WallpaperReviewSnapshots
 
 run: build stop
-	open $(APP)
+	@open $(APP) 2> /dev/null || (sleep 1 && open $(APP))
 
 stop:
 	@-pkill -x Moonlet; while pgrep -x Moonlet > /dev/null; do sleep 0.1; done

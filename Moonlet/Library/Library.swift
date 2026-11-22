@@ -10,9 +10,10 @@ final class Library {
 
     let rootURL: URL
     private(set) var wallpapers: [Wallpaper] = []
+    private(set) var playlists: [Playlist] = []
     private(set) var problems: [Problem] = []
 
-    @ObservationIgnored var onChange: (() -> Void)?
+    @ObservationIgnored private var changeHandlers: [() -> Void] = []
     @ObservationIgnored private var watcher: FolderWatcher?
     @ObservationIgnored private let logger = Logger(subsystem: "dev.moonlet.Moonlet", category: "library")
 
@@ -22,6 +23,14 @@ final class Library {
 
     var wallpapersURL: URL {
         rootURL.appending(path: "wallpapers", directoryHint: .isDirectory)
+    }
+
+    var musicURL: URL {
+        rootURL.appending(path: "music", directoryHint: .isDirectory)
+    }
+
+    func addChangeHandler(_ handler: @escaping () -> Void) {
+        changeHandlers.append(handler)
     }
 
     func wallpaper(withID id: String) -> Wallpaper? {
@@ -43,10 +52,12 @@ final class Library {
             }
         }
 
+        let music = MusicScanner.scan(musicFolder: musicURL)
         wallpapers = found.sorted(by: Self.byName)
-        problems = issues.sorted { $0.location < $1.location }
-        logger.info("Scanned \(found.count) wallpapers, \(issues.count) problems")
-        onChange?()
+        playlists = music.playlists
+        problems = (issues + music.problems).sorted { $0.location < $1.location }
+        logger.info("Scanned \(found.count) wallpapers, \(music.playlists.count) playlists, \(self.problems.count) problems")
+        changeHandlers.forEach { $0() }
     }
 
     func startWatching() {

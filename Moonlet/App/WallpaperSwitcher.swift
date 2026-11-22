@@ -20,6 +20,7 @@ final class WallpaperSwitcher: WallpaperSwitching {
     private(set) var current: Wallpaper?
     private(set) var problems: [Problem] = []
 
+    @ObservationIgnored var onShown: ((Wallpaper) -> Void)?
     @ObservationIgnored private let desktop: DesktopWindowController
     @ObservationIgnored private let fadeDuration: TimeInterval
     @ObservationIgnored private let makeRenderer: RendererMaker
@@ -75,6 +76,7 @@ final class WallpaperSwitcher: WallpaperSwitching {
         current = wallpaper
         problems.removeAll { $0.location == wallpaper.location }
         logger.info("Showing \(wallpaper.id, privacy: .public)")
+        onShown?(wallpaper)
     }
 
     private func rendererReported(_ message: String?, for wallpaper: Wallpaper) {

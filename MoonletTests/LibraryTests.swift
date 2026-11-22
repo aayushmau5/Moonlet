@@ -77,7 +77,7 @@ struct LibraryTests {
         defer { folder.remove() }
         let library = Library(rootURL: folder.root)
         var calls = 0
-        library.onChange = { calls += 1 }
+        library.addChangeHandler { calls += 1 }
 
         library.scan()
         library.scan()

@@ -1,0 +1,201 @@
+import SwiftUI
+
+struct MenuPanel: View {
+    let appState: AppState
+    let audio: AudioController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            WallpaperSection(appState: appState)
+            Divider()
+            MusicSection(audio: audio)
+            if !problems.isEmpty {
+                Divider()
+                ProblemsSection(problems: problems)
+            }
+            Divider()
+            footer
+        }
+        .padding(16)
+        .frame(width: 300)
+    }
+
+    private var problems: [Problem] {
+        (appState.problems + audio.problems).sorted { $0.location < $1.location }
+    }
+
+    private var footer: some View {
+        HStack {
+            Button("Open Library Folder") {
+                NSWorkspace.shared.open(appState.library.rootURL)
+            }
+            Spacer()
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
+            }
+            .keyboardShortcut("q")
+        }
+        .buttonStyle(.borderless)
+        .font(.callout)
+    }
+}
+
+private struct SectionLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.caption2.weight(.semibold))
+            .tracking(0.6)
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct WallpaperSection: View {
+    let appState: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionLabel(text: "Wallpaper")
+            let wallpapers = appState.library.wallpapers
+            if wallpapers.isEmpty {
+                Text("No wallpapers in ~/Moonlet/wallpapers")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 1) {
+                    ForEach(wallpapers) { wallpaper in
+                        WallpaperRow(
+                            wallpaper: wallpaper,
+                            isSelected: appState.selectedWallpaperID == wallpaper.id
+                        ) {
+                            appState.select(wallpaper.id)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct WallpaperRow: View {
+    let wallpaper: Wallpaper
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+                    .opacity(isSelected ? 1 : 0)
+                    .frame(width: 12)
+                Text(wallpaper.name)
+                Spacer()
+                Text(kindLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+
+    private var kindLabel: String {
+        switch wallpaper.kind {
+        case .video: "Video"
+        case .metal: "Shader"
+        case .web: "Web"
+        }
+    }
+}
+
+private struct MusicSection: View {
+    let audio: AudioController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Music")
+            nowPlayingRow
+            sourcePicker
+            Toggle("Shuffle", isOn: Binding(get: { audio.isShuffled }, set: { audio.setShuffled($0) }))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            HStack(spacing: 8) {
+                Image(systemName: "speaker.fill")
+                Slider(value: Binding(get: { audio.volume }, set: { audio.setVolume($0) }), in: 0...1)
+                Image(systemName: "speaker.wave.3.fill")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var nowPlayingRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                audio.togglePause()
+            } label: {
+                Image(systemName: audio.isUserPaused ? "play.fill" : "pause.fill")
+                    .font(.body)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.primary.opacity(0.08)))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help(audio.isUserPaused ? "Play" : "Pause")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(audio.nowPlaying?.title ?? "Nothing playing")
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var detail: String {
+        let source = audio.nowPlaying?.detail ?? "Pick a playlist below"
+        return audio.isUserPaused ? "Paused · \(source)" : source
+    }
+
+    private var sourcePicker: some View {
+        Picker("Source", selection: Binding(get: { audio.selection }, set: { audio.select($0) })) {
+            Text("None").tag(MusicSelection.none)
+            ForEach(audio.library.playlists) { playlist in
+                Text(playlist.name).tag(MusicSelection.playlist(playlist.id))
+            }
+        }
+        .pickerStyle(.menu)
+    }
+}
+
+private struct ProblemsSection: View {
+    let problems: [Problem]
+
+    var body: some View {
+        DisclosureGroup("Problems (\(problems.count))") {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(problems) { problem in
+                    Text("\(problem.location): \(problem.message)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .font(.callout)
+    }
+}

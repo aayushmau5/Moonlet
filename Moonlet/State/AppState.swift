@@ -35,7 +35,7 @@ final class AppState {
     }
 
     func start(watching: Bool = true) {
-        library.onChange = { [weak self] in
+        library.addChangeHandler { [weak self] in
             self?.libraryDidChange()
         }
         library.scan()

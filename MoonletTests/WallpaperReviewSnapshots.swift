@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import ImageIO
 import Metal
+import SwiftUI
 import Testing
 import UniformTypeIdentifiers
 import WebKit
@@ -46,6 +47,35 @@ struct WallpaperReviewSnapshots {
             let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
             try save(cgImage, to: output.appending(path: "\(wallpaper.id).png"))
             renderer.tearDown()
+            window.close()
+        }
+    }
+
+    @Test func renderMenuPanel() async throws {
+        let output = try outputDirectory()
+        let library = Library()
+        let desktop = DesktopWindowController(displayProvider: FakeDisplayProvider([]))
+        let appState = AppState(library: library, switcher: WallpaperSwitcher(desktop: desktop))
+        appState.start(watching: false)
+        let audio = AudioController(library: library, defaults: UserDefaults(suiteName: "moonlet-panel-snapshot")!)
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let background = appearance == .aqua ? Color(white: 0.96) : Color(white: 0.16)
+            let host = NSHostingView(rootView: MenuPanel(appState: appState, audio: audio).background(background))
+            host.appearance = NSAppearance(named: appearance)
+            let size = host.fittingSize
+            host.frame = NSRect(origin: .zero, size: size)
+            let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: appearance)
+            window.backgroundColor = appearance == .aqua ? .windowBackgroundColor : NSColor(white: 0.16, alpha: 1)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(300))
+
+            let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: rep)
+            let image = try #require(rep.cgImage)
+            try save(image, to: output.appending(path: "panel-\(appearance == .aqua ? "light" : "dark").png"))
             window.close()
         }
     }

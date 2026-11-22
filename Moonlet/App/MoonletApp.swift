@@ -6,7 +6,8 @@ struct MoonletApp: App {
 
     var body: some Scene {
         MenuBarExtra("Moonlet", systemImage: "moon.circle") {
-            MenuContent(appState: appDelegate.appState)
+            MenuPanel(appState: appDelegate.appState, audio: appDelegate.audio)
         }
+        .menuBarExtraStyle(.window)
     }
 }
