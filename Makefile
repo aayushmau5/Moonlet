@@ -18,7 +18,7 @@ test: generate
 
 snapshots: generate
 	mkdir -p build/snapshots
-	TEST_RUNNER_MOONLET_SNAPSHOT_DIR=$(CURDIR)/build/snapshots $(XCODEBUILD) test -only-testing:MoonletTests/ShaderReviewSnapshots
+	TEST_RUNNER_MOONLET_SNAPSHOT_DIR=$(CURDIR)/build/snapshots $(XCODEBUILD) test -only-testing:MoonletTests/WallpaperReviewSnapshots
 
 run: build stop
 	open $(APP)

@@ -302,6 +302,8 @@ Music plays only when the music pause-reason set is empty.
   per second. Layer 0 found that property listeners on this flag never fire on
   macOS 27.2, while polling catches every change.
 - It ignores Moonlet's own PID, and every bundle ID in the ignore list.
+- It ignores Moonlet's own WebKit helpers, whose app name starts with
+  "Moonlet ", such as "Moonlet Graphics and Media".
 - `otherAudioActive` is true when any remaining process is running output.
   Processes without a bundle ID, such as `afplay`, count.
 - No permission prompt is needed.
@@ -434,15 +436,34 @@ the Problems list records it.
 
 ### 7.5 Live shader editing
 
-`Library` watches `.metal` files. When one changes:
+`MetalRenderer` watches its own wallpaper folder. When the `.metal` source
+text changes:
 
 1. `MetalRenderer` recompiles it.
 2. On success, it swaps in the new pipeline state without resetting `time`.
-3. On failure, the last working shader keeps running. The settings window
-   shows the compiler message with its line number, adjusted to exclude the
-   prepended header.
+3. On failure, the last working shader keeps running. The Problems list
+   shows the compiler message. A `#line 1 "<file>"` directive after the
+   header makes the compiler report the user's own line numbers.
 
-### 7.6 Startup
+If the selected wallpaper failed to load, the next library change retries
+it, so a new shader can be fixed by saving again without re-picking it.
+
+### 7.6 Web wallpapers
+
+- Each screen gets its own `WKWebView`. A local page loads with read access
+  to its wallpaper folder only.
+- The crossfade waits for the page to finish loading, up to 10 seconds.
+- A load failure is reported to the Problems list and clears on the next
+  successful load.
+- Injected scripts hide scrollbars and mute every `<audio>` and `<video>`
+  element. Web Audio API sound is not muted.
+- Local pages live-reload when any file in their folder changes.
+- CSS animations cost a lot in a web view. In Layer 4, a slow full-screen CSS
+  `transform` animation used about 11% CPU in total, against 1.3% with no
+  animation. Driving the same motion from JavaScript at 10 updates per second
+  used about 4.5%. Sample pages use the JavaScript approach.
+
+### 7.7 Startup
 
 On launch, Moonlet restores:
 
@@ -584,5 +605,6 @@ Layer 0 is done. Its findings are in sections 6.5 and 7.3.
 |---|---|
 | Some apps keep audio output running while silent, which would pause music forever | Default ignore list, plus the play-anyway override. Layer 0 found Vorssaint and system sounds. Music and muted tabs were not tested, so Layer 6 checks them. Firefox is out of scope. |
 | Occlusion state misses covered windows | Confirmed in Layer 0. The coverage check in section 7.3 is the main signal. |
-| WebKit throttling in covered windows is weaker than expected | Layer 4 checks CPU use. If it is too high, `WebRenderer` hides the web view while covered. |
+| WebKit throttling in covered windows is weaker than expected | Layer 6 checks CPU use while covered, since covering only triggers a pause from Layer 6 on. If it is too high, `WebRenderer` hides the web view while covered. |
+| Animated web pages cost far more CPU than video or Metal | Section 7.6 records the measurements. Sample pages animate from JavaScript at 10 updates per second. |
 | Strict concurrency friction with AVFoundation and Core Audio callbacks | Keep every callback a thin hop to the main actor. Keep the logic in testable main-actor types. |
