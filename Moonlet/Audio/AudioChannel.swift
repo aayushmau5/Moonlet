@@ -32,6 +32,8 @@ enum AudioChannelFactory {
             return LoopingChannel(url: soundtrack.url, isVideoAudio: soundtrack.isVideoAudio)
         case .playlist(let playlist):
             return PlaylistChannel(playlist: playlist, start: start, shuffled: shuffled)
+        case .stream(let stream):
+            return StreamChannel(stream: stream)
         }
     }
 }

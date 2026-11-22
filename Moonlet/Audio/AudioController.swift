@@ -51,6 +51,7 @@ final class AudioController {
     @ObservationIgnored private var wallpaper: Wallpaper?
     @ObservationIgnored private var active: ActiveChannel?
     @ObservationIgnored private var playlistPositions: [String: PlaylistPosition] = [:]
+    @ObservationIgnored private var failedIdentity: String?
     @ObservationIgnored private var lastTask: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "dev.moonlet.Moonlet", category: "audio")
 
@@ -98,6 +99,7 @@ final class AudioController {
     @discardableResult
     func select(_ newSelection: MusicSelection) -> Task<Void, Never> {
         selection = newSelection
+        failedIdentity = nil
         defaults.set(newSelection.storageValue, forKey: Self.selectionKey)
         return enqueue { await $0.transition() }
     }
@@ -136,7 +138,12 @@ final class AudioController {
     }
 
     private func transition() async {
-        let source = AudioSource.effective(wallpaper: wallpaper, selection: selection, playlists: library.playlists)
+        let source = AudioSource.effective(
+            wallpaper: wallpaper,
+            selection: selection,
+            playlists: library.playlists,
+            streams: library.streams
+        )
 
         if let active, active.source.identity == source?.identity, let source {
             active.source = source
@@ -153,6 +160,10 @@ final class AudioController {
             logger.info("Music: nothing to play")
             return
         }
+        guard source.identity != failedIdentity else {
+            logger.info("Music: \(source.identity, privacy: .public) failed earlier; waiting to be picked again")
+            return
+        }
 
         let start = playlistStart(for: source)
         guard let channel = makeChannel(source, start, isShuffled) else {
@@ -167,8 +178,9 @@ final class AudioController {
                 self.nowPlaying = NowPlaying(title: title, detail: candidate.source.defaultNowPlaying.detail)
             }
         }
-        channel.onProblem = { [weak self] message in
-            self?.report(message, for: source)
+        channel.onProblem = { [weak self, weak candidate] message in
+            guard let self, let candidate else { return }
+            self.channelFailed(candidate, message: message)
         }
 
         do {
@@ -190,6 +202,16 @@ final class AudioController {
             channel.play()
             fade(candidate, to: 1, over: fades.crossfade)
         }
+    }
+
+    private func channelFailed(_ failed: ActiveChannel, message: String) {
+        report(message, for: failed.source)
+        guard active === failed else { return }
+        failed.fadeTask?.cancel()
+        failed.channel.stop()
+        active = nil
+        nowPlaying = nil
+        failedIdentity = failed.source.identity
     }
 
     private func applyPause(_ paused: Bool) async {

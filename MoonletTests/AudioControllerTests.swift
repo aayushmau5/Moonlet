@@ -36,6 +36,11 @@ final class FakeChannel: AudioChannel, PlaylistControlling {
     func setShuffled(_ shuffled: Bool) {
         isShuffled = shuffled
     }
+
+    func fail(_ message: String) {
+        stop()
+        onProblem?(message)
+    }
 }
 
 @MainActor

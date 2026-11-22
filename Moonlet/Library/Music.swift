@@ -8,9 +8,17 @@ struct Playlist: Identifiable, Equatable, Sendable {
     var location: String { "music/\(id)" }
 }
 
+struct RadioStream: Identifiable, Equatable, Sendable {
+    let name: String
+    let url: URL
+
+    var id: String { name }
+}
+
 enum MusicSelection: Hashable, Sendable {
     case none
     case playlist(String)
+    case stream(String)
 
     init?(storageValue: String?) {
         guard let storageValue else { return nil }
@@ -18,6 +26,8 @@ enum MusicSelection: Hashable, Sendable {
             self = .none
         } else if storageValue.hasPrefix("playlist:") {
             self = .playlist(String(storageValue.dropFirst("playlist:".count)))
+        } else if storageValue.hasPrefix("stream:") {
+            self = .stream(String(storageValue.dropFirst("stream:".count)))
         } else {
             return nil
         }
@@ -27,6 +37,7 @@ enum MusicSelection: Hashable, Sendable {
         switch self {
         case .none: "none"
         case .playlist(let id): "playlist:\(id)"
+        case .stream(let name): "stream:\(name)"
         }
     }
 }
@@ -52,18 +63,20 @@ struct SoundtrackSource: Equatable, Sendable {
 enum AudioSource: Equatable, Sendable {
     case soundtrack(SoundtrackSource)
     case playlist(Playlist)
+    case stream(RadioStream)
 
     var identity: String {
         switch self {
         case .soundtrack(let soundtrack): "soundtrack:\(soundtrack.url.path)"
         case .playlist(let playlist): "playlist:\(playlist.id)"
+        case .stream(let stream): "stream:\(stream.url.absoluteString)"
         }
     }
 
     var volume: Double {
         switch self {
         case .soundtrack(let soundtrack): soundtrack.volume
-        case .playlist: 1
+        case .playlist, .stream: 1
         }
     }
 
@@ -71,6 +84,7 @@ enum AudioSource: Equatable, Sendable {
         switch self {
         case .soundtrack(let soundtrack): "wallpapers/\(soundtrack.wallpaperID)"
         case .playlist(let playlist): playlist.location
+        case .stream: StreamsFile.fileName
         }
     }
 
@@ -78,10 +92,16 @@ enum AudioSource: Equatable, Sendable {
         switch self {
         case .soundtrack(let soundtrack): NowPlaying(title: soundtrack.wallpaperName, detail: "Wallpaper soundtrack")
         case .playlist(let playlist): NowPlaying(title: playlist.name, detail: playlist.name)
+        case .stream(let stream): NowPlaying(title: stream.name, detail: "Internet radio")
         }
     }
 
-    static func effective(wallpaper: Wallpaper?, selection: MusicSelection, playlists: [Playlist]) -> AudioSource? {
+    static func effective(
+        wallpaper: Wallpaper?,
+        selection: MusicSelection,
+        playlists: [Playlist],
+        streams: [RadioStream] = []
+    ) -> AudioSource? {
         if let wallpaper, let soundtrack = soundtrackSource(for: wallpaper) {
             return .soundtrack(soundtrack)
         }
@@ -90,6 +110,8 @@ enum AudioSource: Equatable, Sendable {
             return nil
         case .playlist(let id):
             return playlists.first { $0.id == id }.map(AudioSource.playlist)
+        case .stream(let name):
+            return streams.first { $0.name == name }.map(AudioSource.stream)
         }
     }
 

@@ -11,6 +11,7 @@ final class Library {
     let rootURL: URL
     private(set) var wallpapers: [Wallpaper] = []
     private(set) var playlists: [Playlist] = []
+    private(set) var streams: [RadioStream] = []
     private(set) var problems: [Problem] = []
 
     @ObservationIgnored private var changeHandlers: [() -> Void] = []
@@ -53,9 +54,11 @@ final class Library {
         }
 
         let music = MusicScanner.scan(musicFolder: musicURL)
+        let radio = StreamsFile.load(from: rootURL.appending(path: StreamsFile.fileName))
         wallpapers = found.sorted(by: Self.byName)
         playlists = music.playlists
-        problems = (issues + music.problems).sorted { $0.location < $1.location }
+        streams = radio.streams
+        problems = (issues + music.problems).sorted { $0.location < $1.location } + radio.problems
         logger.info("Scanned \(found.count) wallpapers, \(music.playlists.count) playlists, \(self.problems.count) problems")
         changeHandlers.forEach { $0() }
     }

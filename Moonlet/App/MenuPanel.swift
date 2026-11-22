@@ -173,8 +173,17 @@ private struct MusicSection: View {
     private var sourcePicker: some View {
         Picker("Source", selection: Binding(get: { audio.selection }, set: { audio.select($0) })) {
             Text("None").tag(MusicSelection.none)
-            ForEach(audio.library.playlists) { playlist in
-                Text(playlist.name).tag(MusicSelection.playlist(playlist.id))
+            if !audio.library.playlists.isEmpty {
+                Divider()
+                ForEach(audio.library.playlists) { playlist in
+                    Text(playlist.name).tag(MusicSelection.playlist(playlist.id))
+                }
+            }
+            if !audio.library.streams.isEmpty {
+                Divider()
+                ForEach(audio.library.streams) { stream in
+                    Text(stream.name).tag(MusicSelection.stream(stream.name))
+                }
             }
         }
         .pickerStyle(.menu)
