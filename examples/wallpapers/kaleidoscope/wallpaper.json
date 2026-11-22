@@ -1,0 +1,6 @@
+{
+  "name": "Kaleidoscope",
+  "type": "metal",
+  "source": "kaleidoscope.metal",
+  "renderScale": 0.75
+}

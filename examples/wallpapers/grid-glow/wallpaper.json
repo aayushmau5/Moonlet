@@ -1,0 +1,6 @@
+{
+  "name": "Grid Glow",
+  "type": "metal",
+  "source": "grid-glow.metal",
+  "renderScale": 0.4
+}
