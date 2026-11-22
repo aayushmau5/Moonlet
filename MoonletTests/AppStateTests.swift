@@ -17,7 +17,7 @@ final class AppStateHarness {
     }
 
     func makeState() -> AppState {
-        AppState(library: library, switcher: switcher, defaults: defaults)
+        AppState(library: library, switcher: switcher, defaults: defaults) { $0 == .video }
     }
 
     func cleanUp() {
@@ -156,6 +156,23 @@ struct AppStateTests {
 
         #expect(state.selectedWallpaperID == "one")
         #expect(harness.switcher.switched.map(\.id) == ["one"])
+    }
+
+    @Test func retriesAFailedSelectionOnTheNextScan() throws {
+        let harness = try AppStateHarness()
+        defer { harness.cleanUp() }
+        try harness.folder.addVideo("one", name: "One")
+        try harness.folder.addVideo("two", name: "Two")
+        let state = harness.makeState()
+        state.start(watching: false)
+        harness.switcher.failingIDs = ["two"]
+        state.select("two")
+
+        harness.switcher.failingIDs = []
+        harness.library.scan()
+
+        #expect(harness.switcher.switched.map(\.id) == ["one", "two", "two"])
+        #expect(harness.switcher.requested?.id == "two")
     }
 
     @Test func combinesLibraryAndSwitcherProblems() throws {

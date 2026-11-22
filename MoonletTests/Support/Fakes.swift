@@ -15,6 +15,7 @@ struct FakeLoadError: Error {}
 @MainActor
 final class FakeRenderer: WallpaperRenderer {
     var loadError: Error?
+    var onProblem: ((String?) -> Void)?
     private(set) var attachedDisplayIDs: [CGDirectDisplayID] = []
     private(set) var detachedDisplayIDs: [CGDirectDisplayID] = []
     private(set) var views: [CGDirectDisplayID: NSView] = [:]
@@ -43,6 +44,10 @@ final class FakeRenderer: WallpaperRenderer {
         views[displayID] = nil
     }
 
+    func report(_ message: String?) {
+        onProblem?(message)
+    }
+
     func waitUntilReady() async {}
     func play() { isPlaying = true }
     func pause() { isPlaying = false }
@@ -53,12 +58,15 @@ final class FakeRenderer: WallpaperRenderer {
 final class FakeSwitcher: WallpaperSwitching {
     private(set) var requested: Wallpaper?
     var problems: [Problem] = []
+    var failingIDs: Set<String> = []
     private(set) var switched: [Wallpaper] = []
 
     @discardableResult
     func switchTo(_ wallpaper: Wallpaper) -> Task<Void, Never> {
-        requested = wallpaper
         switched.append(wallpaper)
+        if !failingIDs.contains(wallpaper.id) {
+            requested = wallpaper
+        }
         return Task {}
     }
 }

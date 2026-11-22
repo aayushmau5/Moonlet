@@ -5,7 +5,7 @@ DESTINATION := platform=macOS,arch=arm64
 APP := $(DERIVED)/Build/Products/Debug/Moonlet.app
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -derivedDataPath $(DERIVED) -quiet
 
-.PHONY: generate build test run stop clean
+.PHONY: generate build test snapshots run stop clean
 
 generate:
 	xcodegen generate --quiet
@@ -15,6 +15,10 @@ build: generate
 
 test: generate
 	$(XCODEBUILD) test
+
+snapshots: generate
+	mkdir -p build/snapshots
+	TEST_RUNNER_MOONLET_SNAPSHOT_DIR=$(CURDIR)/build/snapshots $(XCODEBUILD) test -only-testing:MoonletTests/ShaderReviewSnapshots
 
 run: build stop
 	open $(APP)

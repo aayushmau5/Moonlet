@@ -51,10 +51,13 @@ final class AppState {
     }
 
     private func libraryDidChange() {
-        if let requested = switcher.requested {
-            if let updated = library.wallpaper(withID: requested.id), updated != requested, supports(updated) {
-                switcher.switchTo(updated)
+        if let id = selectedWallpaperID, let selected = library.wallpaper(withID: id), supports(selected) {
+            if switcher.requested != selected {
+                switcher.switchTo(selected)
             }
+            return
+        }
+        if switcher.requested != nil {
             return
         }
 

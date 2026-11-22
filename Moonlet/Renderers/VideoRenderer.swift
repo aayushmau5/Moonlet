@@ -8,6 +8,7 @@ enum VideoRendererError: Error, Equatable {
 @MainActor
 final class VideoRenderer: WallpaperRenderer {
     let player = AVQueuePlayer()
+    var onProblem: ((String?) -> Void)?
     private let url: URL
     private var looper: AVPlayerLooper?
     private var views: [CGDirectDisplayID: PlayerLayerView] = [:]

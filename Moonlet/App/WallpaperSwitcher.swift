@@ -54,6 +54,9 @@ final class WallpaperSwitcher: WallpaperSwitching {
             fail(wallpaper, message: "\(wallpaper.kind.rawValue.capitalized) wallpapers are not supported yet")
             return
         }
+        renderer.onProblem = { [weak self] message in
+            self?.rendererReported(message, for: wallpaper)
+        }
 
         do {
             try await renderer.load()
@@ -72,6 +75,16 @@ final class WallpaperSwitcher: WallpaperSwitching {
         current = wallpaper
         problems.removeAll { $0.location == wallpaper.location }
         logger.info("Showing \(wallpaper.id, privacy: .public)")
+    }
+
+    private func rendererReported(_ message: String?, for wallpaper: Wallpaper) {
+        problems.removeAll { $0.location == wallpaper.location }
+        if let message {
+            logger.error("\(wallpaper.id, privacy: .public): \(message, privacy: .public)")
+            problems.append(Problem(location: wallpaper.location, message: message))
+        } else {
+            logger.info("\(wallpaper.id, privacy: .public): problem cleared")
+        }
     }
 
     private func fail(_ wallpaper: Wallpaper, message: String) {

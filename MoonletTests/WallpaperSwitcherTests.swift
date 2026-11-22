@@ -94,6 +94,20 @@ struct WallpaperSwitcherTests {
         #expect(harness.madeIDs == ["two"])
     }
 
+    @Test func rendererProblemsAppearAndClear() async {
+        let harness = SwitcherHarness()
+        defer { harness.controller.closeAll() }
+        let switcher = harness.makeSwitcher()
+        await switcher.switchTo(harness.wallpaper("one")).value
+        let renderer = harness.renderers["one"]
+
+        renderer?.report("line 3: oops")
+        #expect(switcher.problems == [Problem(location: "wallpapers/one", message: "line 3: oops")])
+
+        renderer?.report(nil)
+        #expect(switcher.problems.isEmpty)
+    }
+
     @Test func successClearsAnEarlierProblemForThatWallpaper() async {
         let harness = SwitcherHarness()
         defer { harness.controller.closeAll() }
