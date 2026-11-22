@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let switcher: WallpaperSwitcher
     private let otherAudio = OtherAudioDetector(monitor: PlaybackMonitor(ignoredBundleIDs: PlaybackMonitor.savedIgnoreList()))
     private let system = SystemMonitor()
+    private var visibility: VisibilityMonitor?
+    private var coveredDisplays: Set<CGDirectDisplayID> = []
+    private var isSystemPaused = false
 
     override init() {
         let library = Library()
@@ -32,15 +35,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         otherAudio.onChange = { [audio] app in
             audio.setOtherAudio(app)
         }
-        system.onChange = { [audio] text in
+        system.addChangeHandler { [audio] text in
             audio.setSystemPause(text)
         }
+        system.addChangeHandler { [weak self] text in
+            self?.isSystemPaused = text != nil
+            self?.updateVisualPause()
+        }
+        let visibility = VisibilityMonitor(displayProvider: SystemDisplayProvider()) { [desktop] displayID in
+            guard let window = desktop.windows[displayID] else { return false }
+            return !window.occlusionState.contains(.visible)
+        }
+        visibility.onChange = { [weak self] covered in
+            self?.coveredDisplays = covered
+            self?.updateVisualPause()
+        }
+        self.visibility = visibility
 
         desktop.start()
         appState.start()
         startMusicWithoutWaitingIfNeeded()
         otherAudio.start()
         system.start()
+        visibility.start()
+    }
+
+    private func updateVisualPause() {
+        let paused = isSystemPaused ? Set(desktop.windows.keys) : coveredDisplays
+        desktop.setPausedDisplays(paused)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

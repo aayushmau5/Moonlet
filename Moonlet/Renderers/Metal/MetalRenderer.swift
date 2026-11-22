@@ -18,11 +18,16 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     private var views: [CGDirectDisplayID: MTKView] = [:]
     private var clock = ShaderClock()
     private var isPlaying = false
+    private var pausedDisplays: Set<CGDirectDisplayID> = []
     private var hasDrawnFrame = false
     private var watcher: FolderWatcher?
 
     var attachedDisplayIDs: [CGDirectDisplayID] {
         Array(views.keys)
+    }
+
+    var isClockRunning: Bool {
+        clock.isRunning
     }
 
     init(sourceURL: URL, device: MTLDevice, watchesSource: Bool = true) {
@@ -63,7 +68,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         view.framebufferOnly = true
         view.preferredFramesPerSecond = Self.framesPerSecond
         view.enableSetNeedsDisplay = false
-        view.isPaused = !isPlaying
+        view.isPaused = !isPlaying || pausedDisplays.contains(display.id)
         view.delegate = self
         views[display.id] = view
         return view
@@ -84,15 +89,30 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     }
 
     func play() {
-        clock.resume(at: .now)
         isPlaying = true
-        views.values.forEach { $0.isPaused = false }
+        applyRunState()
     }
 
     func pause() {
-        clock.pause(at: .now)
         isPlaying = false
-        views.values.forEach { $0.isPaused = true }
+        applyRunState()
+    }
+
+    func setPausedDisplays(_ displays: Set<CGDirectDisplayID>) {
+        pausedDisplays = displays
+        applyRunState()
+    }
+
+    private func applyRunState() {
+        for (id, view) in views {
+            view.isPaused = !isPlaying || pausedDisplays.contains(id)
+        }
+        let anyScreenRunning = views.isEmpty || views.keys.contains { !pausedDisplays.contains($0) }
+        if isPlaying && anyScreenRunning {
+            clock.resume(at: .now)
+        } else {
+            clock.pause(at: .now)
+        }
     }
 
     func tearDown() {

@@ -44,8 +44,14 @@ final class FakeRenderer: WallpaperRenderer {
         views[displayID] = nil
     }
 
+    private(set) var pausedDisplays: Set<CGDirectDisplayID> = []
+
     func report(_ message: String?) {
         onProblem?(message)
+    }
+
+    func setPausedDisplays(_ displays: Set<CGDirectDisplayID>) {
+        pausedDisplays = displays
     }
 
     func waitUntilReady() async {}

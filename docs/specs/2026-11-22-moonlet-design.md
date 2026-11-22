@@ -384,7 +384,7 @@ Granularity:
 |---|---|---|
 | Video | `AVPlayer.pause()`. Freezes on the last frame. | `play()` from the same position |
 | Metal | `MTKView.isPaused = true` | `isPaused = false`. `time` continues from where it froze. |
-| Web | `setAllMediaPlaybackSuspended(true)`. WebKit already throttles timers and animation frames in occluded windows. | `setAllMediaPlaybackSuspended(false)` |
+| Web | `setAllMediaPlaybackSuspended(true)`, and the web view is hidden. Layer 6b found that WebKit only throttles itself when the window is fully occluded, which a window filling the usable area does not do: a covered Clock page still used about 6% CPU. Hiding the view brought it to about 3.3%, against about 2% for a paused video or shader. | `setAllMediaPlaybackSuspended(false)`, and the view is shown again. |
 
 ### 7.3 Detecting "covered"
 
@@ -396,7 +396,7 @@ A screen counts as covered when either signal says so:
 
 1. **Coverage check.** `VisibilityMonitor` polls
    `CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)`
-   every 2 seconds. It looks at windows at layer 0 (normal app windows) that
+   every second, so a pause lands within about 2 seconds. It looks at windows at layer 0 (normal app windows) that
    do not belong to Moonlet and have alpha above 0. If one window covers at
    least 95% of the screen's `visibleFrame`, the screen counts as covered.
    Layer 0 measured 100% for a fullscreen app and 98% to 100% for a window
@@ -612,6 +612,6 @@ Layer 0 is done. Its findings are in sections 6.5 and 7.3.
 |---|---|
 | Some apps keep audio output running while silent, which would pause music forever | Default ignore list, plus the play-anyway override. Layer 0 found Vorssaint and system sounds. Music and muted tabs were not tested, so Layer 6 checks them. Firefox is out of scope. |
 | Occlusion state misses covered windows | Confirmed in Layer 0. The coverage check in section 7.3 is the main signal. |
-| WebKit throttling in covered windows is weaker than expected | Layer 6 checks CPU use while covered, since covering only triggers a pause from Layer 6 on. If it is too high, `WebRenderer` hides the web view while covered. |
+| WebKit throttling in covered windows is weaker than expected | Confirmed in Layer 6b. `WebRenderer` hides the web view while covered (section 7.2). |
 | Animated web pages cost far more CPU than video or Metal | Section 7.6 records the measurements. Sample pages animate from JavaScript at 10 updates per second. |
 | Strict concurrency friction with AVFoundation and Core Audio callbacks | Keep every callback a thin hop to the main actor. Keep the logic in testable main-actor types. |

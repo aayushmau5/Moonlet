@@ -4,6 +4,10 @@ struct ShaderClock {
     private var accumulated: Duration = .zero
     private var resumedAt: ContinuousClock.Instant?
 
+    var isRunning: Bool {
+        resumedAt != nil
+    }
+
     mutating func resume(at now: ContinuousClock.Instant) {
         guard resumedAt == nil else { return }
         resumedAt = now

@@ -6,6 +6,7 @@ final class DesktopWindowController: NSObject {
     private(set) var windows: [CGDirectDisplayID: NSWindow] = [:]
     private var renderer: WallpaperRenderer?
     private var rendererViews: [CGDirectDisplayID: NSView] = [:]
+    private(set) var pausedDisplays: Set<CGDirectDisplayID> = []
 
     init(displayProvider: DisplayProvider) {
         self.displayProvider = displayProvider
@@ -24,6 +25,11 @@ final class DesktopWindowController: NSObject {
 
     func displayedView(on displayID: CGDirectDisplayID) -> NSView? {
         rendererViews[displayID]
+    }
+
+    func setPausedDisplays(_ displays: Set<CGDirectDisplayID>) {
+        pausedDisplays = displays
+        renderer?.setPausedDisplays(displays)
     }
 
     func crossfade(to newRenderer: WallpaperRenderer, duration: TimeInterval) async {
@@ -46,6 +52,7 @@ final class DesktopWindowController: NSObject {
             oldRenderer.tearDown()
         }
         removeStaleViews()
+        newRenderer.setPausedDisplays(pausedDisplays)
     }
 
     func rebuild() {
@@ -89,6 +96,7 @@ final class DesktopWindowController: NSObject {
         window.contentView = container
         if let renderer {
             install(renderer, on: display, in: container)
+            renderer.setPausedDisplays(pausedDisplays)
         }
         window.orderFrontRegardless()
         return window

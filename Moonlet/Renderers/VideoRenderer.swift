@@ -12,6 +12,9 @@ final class VideoRenderer: WallpaperRenderer {
     private let url: URL
     private var looper: AVPlayerLooper?
     private var views: [CGDirectDisplayID: PlayerLayerView] = [:]
+    private var wantsToRun = false
+    private var pausedDisplays: Set<CGDirectDisplayID> = []
+    private(set) var isRunning = false
 
     var attachedDisplayIDs: [CGDirectDisplayID] {
         Array(views.keys)
@@ -43,6 +46,7 @@ final class VideoRenderer: WallpaperRenderer {
     func detach(from displayID: CGDirectDisplayID) {
         views[displayID]?.playerLayer.player = nil
         views[displayID] = nil
+        applyRunState()
     }
 
     func waitUntilReady() async {
@@ -55,14 +59,35 @@ final class VideoRenderer: WallpaperRenderer {
     }
 
     func play() {
-        player.play()
+        wantsToRun = true
+        applyRunState()
     }
 
     func pause() {
-        player.pause()
+        wantsToRun = false
+        applyRunState()
+    }
+
+    func setPausedDisplays(_ displays: Set<CGDirectDisplayID>) {
+        pausedDisplays = displays
+        applyRunState()
+    }
+
+    private func applyRunState() {
+        let everyScreenPaused = !views.isEmpty && Set(views.keys).isSubset(of: pausedDisplays)
+        let shouldRun = wantsToRun && !everyScreenPaused
+        guard shouldRun != isRunning else { return }
+        isRunning = shouldRun
+        if shouldRun {
+            player.play()
+        } else {
+            player.pause()
+        }
     }
 
     func tearDown() {
+        wantsToRun = false
+        isRunning = false
         player.pause()
         looper?.disableLooping()
         looper = nil

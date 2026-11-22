@@ -18,6 +18,8 @@ final class WebRenderer: NSObject, WallpaperRenderer {
     private var views: [CGDirectDisplayID: WKWebView] = [:]
     private var loadedViews: Set<ObjectIdentifier> = []
     private var hasProblem = false
+    private var isPlaying = false
+    private(set) var pausedDisplayIDs: Set<CGDirectDisplayID> = []
     private var watcher: FolderWatcher?
     private let logger = Logger(subsystem: "dev.moonlet.Moonlet", category: "web")
 
@@ -72,11 +74,26 @@ final class WebRenderer: NSObject, WallpaperRenderer {
     }
 
     func play() {
-        views.values.forEach { $0.setAllMediaPlaybackSuspended(false, completionHandler: nil) }
+        isPlaying = true
+        applyRunState()
     }
 
     func pause() {
-        views.values.forEach { $0.setAllMediaPlaybackSuspended(true, completionHandler: nil) }
+        isPlaying = false
+        applyRunState()
+    }
+
+    func setPausedDisplays(_ displays: Set<CGDirectDisplayID>) {
+        pausedDisplayIDs = displays
+        applyRunState()
+    }
+
+    private func applyRunState() {
+        for (id, view) in views {
+            let suspended = !isPlaying || pausedDisplayIDs.contains(id)
+            view.setAllMediaPlaybackSuspended(suspended, completionHandler: nil)
+            view.isHidden = pausedDisplayIDs.contains(id)
+        }
     }
 
     func tearDown() {

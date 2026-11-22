@@ -8,7 +8,7 @@ final class SystemMonitor {
         case macAsleep
     }
 
-    var onChange: ((String?) -> Void)?
+    private var handlers: [(String?) -> Void] = []
     private(set) var active: Set<Condition> = []
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
 
@@ -17,6 +17,10 @@ final class SystemMonitor {
         if active.contains(.screenLocked) { return "screen locked" }
         if active.contains(.displayAsleep) { return "display asleep" }
         return nil
+    }
+
+    func addChangeHandler(_ handler: @escaping (String?) -> Void) {
+        handlers.append(handler)
     }
 
     func start() {
@@ -40,7 +44,7 @@ final class SystemMonitor {
             active.remove(condition)
         }
         if pauseText != before {
-            onChange?(pauseText)
+            handlers.forEach { $0(pauseText) }
         }
     }
 
