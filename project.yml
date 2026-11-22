@@ -1,0 +1,60 @@
+name: Moonlet
+
+options:
+  bundleIdPrefix: dev.moonlet
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  Moonlet:
+    type: application
+    platform: macOS
+    sources:
+      - Moonlet
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.moonlet.Moonlet
+        PRODUCT_NAME: Moonlet
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Moonlet
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_APP_SANDBOX: NO
+
+  MoonletTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - MoonletTests
+    dependencies:
+      - target: Moonlet
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.moonlet.MoonletTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Moonlet.app/Contents/MacOS/Moonlet
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  Moonlet:
+    build:
+      targets:
+        Moonlet: all
+        MoonletTests: [test]
+    test:
+      targets:
+        - MoonletTests
+    run:
+      config: Debug
