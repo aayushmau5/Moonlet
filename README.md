@@ -53,7 +53,7 @@ You can then turn on "Launch at login" in Moonlet's settings.
 make examples
 ```
 
-This copies 17 example wallpapers (shaders and web pages), 2 packs, and a "Nature" playlist of generated rain, waves, stream, wind, and fire sounds into `~/Moonlet`. It never overwrites anything already there.
+This copies 29 example wallpapers (shaders and web pages), 2 packs, and a "Nature" playlist of generated rain, waves, stream, wind, and fire sounds into `~/Moonlet`. It never overwrites anything already there.
 
 ```sh
 make videos
