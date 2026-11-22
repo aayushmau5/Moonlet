@@ -10,6 +10,7 @@ private struct RawManifest: Decodable {
     let source: String?
     let soundtrack: String?
     let volume: Double?
+    let renderScale: Double?
 }
 
 enum WallpaperManifestParser {
@@ -49,6 +50,10 @@ enum WallpaperManifestParser {
         guard (0...1).contains(volume) else {
             throw ManifestProblem(message: #""volume" must be between 0 and 1"#)
         }
+        let renderScale = raw.renderScale ?? 1
+        guard (0.25...1).contains(renderScale) else {
+            throw ManifestProblem(message: #""renderScale" must be between 0.25 and 1"#)
+        }
 
         return Wallpaper(
             id: folder.lastPathComponent,
@@ -57,7 +62,8 @@ enum WallpaperManifestParser {
             source: source,
             soundtrack: soundtrack,
             volume: volume,
-            folder: folder
+            folder: folder,
+            renderScale: renderScale
         )
     }
 

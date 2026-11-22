@@ -156,6 +156,7 @@ wallpaper's ID. Each folder has a `wallpaper.json`:
 | `source` | yes | A file in the folder. For `web`, it may also be an `http` or `https` URL. |
 | `soundtrack` | no | A file in the folder, or `"video"` to use the video's own audio track |
 | `volume` | no | 0 to 1, default 1. Scales the soundtrack against the master volume. |
+| `renderScale` | no | 0.25 to 1, default 1. Metal wallpapers render at this fraction of the screen's resolution and are scaled up, which cuts GPU work and memory for soft or heavy shaders. Ignored by video and web wallpapers. |
 
 Supported files:
 

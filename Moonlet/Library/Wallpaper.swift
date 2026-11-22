@@ -24,6 +24,7 @@ struct Wallpaper: Identifiable, Equatable, Sendable {
     let soundtrack: Soundtrack?
     let volume: Double
     let folder: URL
+    var renderScale: Double = 1
 
     var location: String {
         "wallpapers/\(id)"
@@ -35,6 +36,7 @@ struct Wallpaper: Identifiable, Equatable, Sendable {
             && source == other.source
             && soundtrack == other.soundtrack
             && volume == other.volume
+            && renderScale == other.renderScale
     }
 }
 

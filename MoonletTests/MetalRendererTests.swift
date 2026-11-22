@@ -139,6 +139,22 @@ struct MetalRendererTests {
         #expect(renderer.attachedDisplayIDs.isEmpty)
     }
 
+    @Test func rendersAtTheRequestedScale() async throws {
+        let file = try ShaderFile(Shaders.solid(0, 0, 1))
+        defer { file.remove() }
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = MetalRenderer(sourceURL: file.url, device: device, renderScale: 0.5, watchesSource: false)
+        try await renderer.load()
+
+        let view = try #require(renderer.attach(to: laptop) as? MTKView)
+        view.layout()
+
+        let backing = view.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        #expect(view.drawableSize.width == (laptop.frame.width * backing * 0.5).rounded())
+        #expect(view.drawableSize.height == (laptop.frame.height * backing * 0.5).rounded())
+        renderer.tearDown()
+    }
+
     @Test func brokenEditKeepsTheOldShaderAndReportsAProblem() async throws {
         let file = try ShaderFile(Shaders.solid(1, 0, 0))
         defer { file.remove() }

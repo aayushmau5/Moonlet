@@ -14,6 +14,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue?
     private let watchesSource: Bool
+    private let renderScale: Double
     private var loadedSource: String?
     private var views: [CGDirectDisplayID: MTKView] = [:]
     private var clock = ShaderClock()
@@ -30,9 +31,10 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         clock.isRunning
     }
 
-    init(sourceURL: URL, device: MTLDevice, watchesSource: Bool = true) {
+    init(sourceURL: URL, device: MTLDevice, renderScale: Double = 1, watchesSource: Bool = true) {
         self.sourceURL = sourceURL
         self.device = device
+        self.renderScale = renderScale
         self.commandQueue = device.makeCommandQueue()
         self.watchesSource = watchesSource
         super.init()
@@ -62,7 +64,8 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     }
 
     func attach(to display: DisplayInfo) -> NSView {
-        let view = MTKView(frame: NSRect(origin: .zero, size: display.frame.size), device: device)
+        let view = ScaledMetalView(frame: NSRect(origin: .zero, size: display.frame.size), device: device)
+        view.renderScale = renderScale
         view.colorPixelFormat = Self.pixelFormat
         view.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         view.framebufferOnly = true
@@ -260,5 +263,34 @@ extension MetalRenderer: MTKViewDelegate {
         buffer.present(drawable)
         buffer.commit()
         hasDrawnFrame = true
+    }
+}
+
+final class ScaledMetalView: MTKView {
+    var renderScale: Double = 1 {
+        didSet {
+            autoResizeDrawable = renderScale >= 1
+            updateDrawableSize()
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        updateDrawableSize()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        updateDrawableSize()
+    }
+
+    private func updateDrawableSize() {
+        guard renderScale < 1 else { return }
+        let backing = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let scale = backing * renderScale
+        drawableSize = CGSize(
+            width: (bounds.width * scale).rounded(),
+            height: (bounds.height * scale).rounded()
+        )
     }
 }

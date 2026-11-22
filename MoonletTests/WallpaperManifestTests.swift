@@ -90,6 +90,20 @@ struct WallpaperManifestTests {
         #expect(try WallpaperManifestParser.parse(folder: web).get().source == .file(web.appending(path: "index.html")))
     }
 
+    @Test func readsAnOptionalRenderScale() throws {
+        let library = try TestLibraryFolder()
+        defer { library.remove() }
+        let scaled = try library.addWallpaper(
+            "nebula",
+            manifest: #"{ "name": "Nebula", "type": "metal", "source": "n.metal", "renderScale": 0.5 }"#,
+            files: ["n.metal"]
+        )
+        let plain = try library.addVideo("plain", name: "Plain")
+
+        #expect(try WallpaperManifestParser.parse(folder: scaled).get().renderScale == 0.5)
+        #expect(try WallpaperManifestParser.parse(folder: plain).get().renderScale == 1)
+    }
+
     static let invalidCases: [InvalidManifestCase] = [
         .init(label: "no manifest", manifest: nil, files: [], expectedMessage: "Missing wallpaper.json"),
         .init(label: "bad JSON", manifest: "{ name: ", files: [], expectedMessage: "not valid JSON"),
@@ -106,6 +120,7 @@ struct WallpaperManifestTests {
         .init(label: "soundtrack not found", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "soundtrack": "a.m4a" }"#, files: ["a.mp4"], expectedMessage: "not found"),
         .init(label: "soundtrack not audio", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "soundtrack": "a.txt" }"#, files: ["a.mp4", "a.txt"], expectedMessage: "audio file"),
         .init(label: "volume too high", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "volume": 1.5 }"#, files: ["a.mp4"], expectedMessage: "between 0 and 1"),
+        .init(label: "render scale too small", manifest: #"{ "name": "A", "type": "metal", "source": "a.metal", "renderScale": 0.1 }"#, files: ["a.metal"], expectedMessage: #""renderScale" must be between 0.25 and 1"#),
         .init(label: "volume wrong type", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "volume": "loud" }"#, files: ["a.mp4"], expectedMessage: #""volume" has the wrong type"#),
     ]
 
