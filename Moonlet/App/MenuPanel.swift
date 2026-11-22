@@ -87,14 +87,37 @@ private struct SectionLabel: View {
 }
 
 private struct WallpaperSection: View {
+    static let maxListHeight: CGFloat = 340
+
     let appState: AppState
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             SectionLabel(text: "Wallpaper")
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    choices
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                            contentHeight = height
+                        }
+                }
+                .scrollIndicators(.automatic)
+                .frame(height: min(max(contentHeight, 1), Self.maxListHeight))
+                .onAppear {
+                    DispatchQueue.main.async {
+                        scrollToSelection(with: proxy)
+                    }
+                }
+            }
+        }
+    }
+
+    private var choices: some View {
+        VStack(alignment: .leading, spacing: 6) {
             let wallpapers = appState.library.wallpapers
             if wallpapers.isEmpty {
-                Text("No wallpapers in ~/Moonlet/wallpapers")
+                Text("No wallpapers in the library yet")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
@@ -107,6 +130,7 @@ private struct WallpaperSection: View {
                         ) {
                             appState.select(wallpaper.id)
                         }
+                        .id(Self.scrollID(wallpaper: wallpaper.id))
                     }
                 }
             }
@@ -124,10 +148,28 @@ private struct WallpaperSection: View {
                         ) {
                             appState.selectPack(pack.id)
                         }
+                        .id(Self.scrollID(pack: pack.id))
                     }
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func scrollToSelection(with proxy: ScrollViewProxy) {
+        if let pack = appState.selectedPackID {
+            proxy.scrollTo(Self.scrollID(pack: pack), anchor: .center)
+        } else if let wallpaper = appState.selectedWallpaperID {
+            proxy.scrollTo(Self.scrollID(wallpaper: wallpaper), anchor: .center)
+        }
+    }
+
+    private static func scrollID(wallpaper id: String) -> String {
+        "wallpaper:\(id)"
+    }
+
+    private static func scrollID(pack id: String) -> String {
+        "pack:\(id)"
     }
 
     private func kindLabel(_ kind: WallpaperKind) -> String {
