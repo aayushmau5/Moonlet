@@ -5,6 +5,7 @@ struct SettingsWindow: View {
     let audio: AudioController
     let loginItem: LoginItem
     let thumbnails: Thumbnails
+    let ignoreList: IgnoreList
 
     var body: some View {
         TabView {
@@ -13,6 +14,12 @@ struct SettingsWindow: View {
             }
             Tab("Library", systemImage: "photo.on.rectangle") {
                 LibraryTab(appState: appState, thumbnails: thumbnails)
+            }
+            Tab("Music", systemImage: "music.note") {
+                MusicTab(library: appState.library, ignoreList: ignoreList)
+            }
+            Tab("Packs", systemImage: "square.stack") {
+                PacksTab(appState: appState)
             }
             Tab("Problems", systemImage: "exclamationmark.triangle") {
                 ProblemsTab(problems: ProblemList.combined(appState, audio))

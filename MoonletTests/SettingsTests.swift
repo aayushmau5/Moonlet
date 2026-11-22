@@ -147,3 +147,122 @@ struct LoginItemTests {
         #expect(LoginItem(service: service, bundlePath: "/Users/me/moonlet/build/Moonlet.app").developmentWarning != nil)
     }
 }
+
+@MainActor
+struct DeleteWallpaperTests {
+    func harness() throws -> AppStateHarness {
+        let harness = try AppStateHarness()
+        try harness.folder.addVideo("one", name: "One")
+        try harness.folder.addVideo("two", name: "Two")
+        try harness.folder.addVideo("three", name: "Three")
+        return harness
+    }
+
+    @Test func removesTheFolderAndKeepsTheCurrentWallpaper() throws {
+        let harness = try harness()
+        defer { harness.cleanUp() }
+        let state = harness.makeState()
+        state.start(watching: false)
+        state.select("one")
+
+        try state.moveToTrash("two")
+
+        #expect(!FileManager.default.fileExists(atPath: harness.folder.wallpapersURL.appending(path: "two").path))
+        #expect(harness.library.wallpapers.map(\.id) == ["one", "three"])
+        #expect(state.selectedWallpaperID == "one")
+    }
+
+    @Test func showsAnotherWallpaperWhenTheCurrentOneGoes() throws {
+        let harness = try harness()
+        defer { harness.cleanUp() }
+        let state = harness.makeState()
+        state.start(watching: false)
+        state.select("three")
+
+        try state.moveToTrash("three")
+
+        #expect(state.selectedWallpaperID == "one")
+        #expect(harness.switcher.switched.last?.id == "one")
+    }
+
+    @Test func refusesAnUnknownWallpaper() throws {
+        let harness = try harness()
+        defer { harness.cleanUp() }
+        let state = harness.makeState()
+        state.start(watching: false)
+
+        #expect(throws: (any Error).self) {
+            try state.moveToTrash("missing")
+        }
+    }
+}
+
+@MainActor
+struct RenameWallpaperTests {
+    func manifest(_ harness: AppStateHarness, _ id: String) throws -> [String: Any] {
+        let data = try Data(contentsOf: harness.folder.wallpapersURL.appending(path: "\(id)/wallpaper.json"))
+        return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    @Test func changesTheNameAndKeepsEverythingElse() throws {
+        let harness = try AppStateHarness()
+        defer { harness.cleanUp() }
+        try harness.folder.addWallpaper(
+            "rain",
+            manifest: #"{ "name": "Rain", "type": "video", "source": "clip.mp4", "volume": 0.5 }"#,
+            files: ["clip.mp4"]
+        )
+        let state = harness.makeState()
+        state.start(watching: false)
+
+        try state.rename("rain", to: "  Rain on Glass  ")
+
+        let fields = try manifest(harness, "rain")
+        #expect(fields["name"] as? String == "Rain on Glass")
+        #expect(fields["type"] as? String == "video")
+        #expect(fields["source"] as? String == "clip.mp4")
+        #expect(fields["volume"] as? Double == 0.5)
+        #expect(harness.library.wallpaper(withID: "rain")?.name == "Rain on Glass")
+    }
+
+    @Test func renamingTheCurrentWallpaperDoesNotReloadIt() throws {
+        let harness = try AppStateHarness()
+        defer { harness.cleanUp() }
+        try harness.folder.addVideo("one", name: "One")
+        let state = harness.makeState()
+        state.start(watching: false)
+
+        try state.rename("one", to: "First")
+
+        #expect(harness.switcher.switched.map(\.name) == ["One"])
+    }
+
+    @Test func rejectsAnEmptyNameOrUnknownWallpaper() throws {
+        let harness = try AppStateHarness()
+        defer { harness.cleanUp() }
+        try harness.folder.addVideo("one", name: "One")
+        let state = harness.makeState()
+        state.start(watching: false)
+
+        #expect(throws: (any Error).self) { try state.rename("one", to: "   ") }
+        #expect(throws: (any Error).self) { try state.rename("missing", to: "Name") }
+        #expect(harness.library.wallpaper(withID: "one")?.name == "One")
+    }
+
+    @Test func aRealContentChangeStillReloads() throws {
+        let harness = try AppStateHarness()
+        defer { harness.cleanUp() }
+        try harness.folder.addVideo("one", name: "One")
+        let state = harness.makeState()
+        state.start(watching: false)
+
+        try harness.folder.addWallpaper(
+            "one",
+            manifest: #"{ "name": "One", "type": "video", "source": "clip.mp4", "volume": 0.3 }"#,
+            files: ["clip.mp4"]
+        )
+        harness.library.scan()
+
+        #expect(harness.switcher.switched.count == 2)
+    }
+}

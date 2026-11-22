@@ -12,6 +12,10 @@ final class OtherAudioDetector {
         self.monitor = monitor
     }
 
+    func setIgnoredBundleIDs(_ bundleIDs: Set<String>) {
+        monitor.ignoredBundleIDs = bundleIDs
+    }
+
     func start() {
         monitor.onTick = { [weak self] app in
             self?.tick(app)

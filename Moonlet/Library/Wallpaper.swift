@@ -28,6 +28,14 @@ struct Wallpaper: Identifiable, Equatable, Sendable {
     var location: String {
         "wallpapers/\(id)"
     }
+
+    func hasSameContent(as other: Wallpaper) -> Bool {
+        id == other.id
+            && kind == other.kind
+            && source == other.source
+            && soundtrack == other.soundtrack
+            && volume == other.volume
+    }
 }
 
 struct Problem: Identifiable, Equatable, Sendable {

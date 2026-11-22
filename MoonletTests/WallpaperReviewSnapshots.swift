@@ -77,7 +77,7 @@ struct WallpaperReviewSnapshots {
         ]
 
         try await render(
-            SettingsWindow(appState: appState, audio: audio, loginItem: LoginItem(), thumbnails: thumbnails),
+            SettingsWindow(appState: appState, audio: audio, loginItem: LoginItem(), thumbnails: thumbnails, ignoreList: IgnoreList()),
             size: NSSize(width: 680, height: 480),
             name: "settings-window",
             to: output
@@ -85,6 +85,8 @@ struct WallpaperReviewSnapshots {
         try await render(GeneralTab(appState: appState, loginItem: LoginItem()), size: size, name: "settings-general", to: output)
         try await render(LibraryTab(appState: appState, thumbnails: thumbnails), size: size, name: "settings-library", to: output, settle: .seconds(3))
         try await render(ProblemsTab(problems: sampleProblems), size: size, name: "settings-problems", to: output)
+        try await render(MusicTab(library: library, ignoreList: IgnoreList()), size: size, name: "settings-music", to: output)
+        try await render(PacksTab(appState: appState), size: size, name: "settings-packs", to: output)
         try await render(ProblemsTab(problems: []), size: size, name: "settings-no-problems", to: output)
     }
 

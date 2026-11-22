@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let audio: AudioController
     let loginItem = LoginItem()
     let thumbnails = Thumbnails()
+    let ignoreList = IgnoreList()
     private let desktop: DesktopWindowController
     private let switcher: WallpaperSwitcher
     private let otherAudio = OtherAudioDetector(monitor: PlaybackMonitor(ignoredBundleIDs: PlaybackMonitor.savedIgnoreList()))
@@ -36,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         otherAudio.onChange = { [audio] app in
             audio.setOtherAudio(app)
+        }
+        ignoreList.onChange = { [otherAudio] bundleIDs in
+            otherAudio.setIgnoredBundleIDs(bundleIDs)
         }
         system.addChangeHandler { [audio] text in
             audio.setSystemPause(text)

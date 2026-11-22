@@ -17,7 +17,13 @@ final class AppStateHarness {
     }
 
     func makeState(scheduler: PackScheduler = PackScheduler()) -> AppState {
-        AppState(library: library, switcher: switcher, defaults: defaults, scheduler: scheduler) { $0 == .video }
+        AppState(
+            library: library,
+            switcher: switcher,
+            defaults: defaults,
+            scheduler: scheduler,
+            removeItem: { try FileManager.default.removeItem(at: $0) }
+        ) { $0 == .video }
     }
 
     func cleanUp() {
@@ -112,10 +118,14 @@ struct AppStateTests {
         let state = harness.makeState()
         state.start(watching: false)
 
-        try harness.folder.addVideo("one", name: "One Renamed")
+        try harness.folder.addWallpaper(
+            "one",
+            manifest: #"{ "name": "One", "type": "video", "source": "clip.mp4", "volume": 0.4 }"#,
+            files: ["clip.mp4"]
+        )
         harness.library.scan()
 
-        #expect(harness.switcher.switched.map(\.name) == ["One", "One Renamed"])
+        #expect(harness.switcher.switched.map(\.volume) == [1, 0.4])
     }
 
     @Test func keepsPlayingWhenTheCurrentFolderIsDeleted() throws {

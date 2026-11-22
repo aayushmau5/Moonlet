@@ -17,7 +17,8 @@ struct MoonletApp: App {
                 appState: appDelegate.appState,
                 audio: appDelegate.audio,
                 loginItem: appDelegate.loginItem,
-                thumbnails: appDelegate.thumbnails
+                thumbnails: appDelegate.thumbnails,
+                ignoreList: appDelegate.ignoreList
             )
         }
         .windowResizability(.contentSize)

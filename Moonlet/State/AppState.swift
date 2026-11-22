@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+struct WallpaperRemovalError: LocalizedError {
+    let message: String
+
+    var errorDescription: String? { message }
+}
+
 @MainActor
 @Observable
 final class AppState {
@@ -15,12 +21,14 @@ final class AppState {
     @ObservationIgnored private let switcher: WallpaperSwitching
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let isSupported: @MainActor (WallpaperKind) -> Bool
+    @ObservationIgnored private let removeItem: (URL) throws -> Void
 
     init(
         library: Library,
         switcher: WallpaperSwitching,
         defaults: UserDefaults = .standard,
         scheduler: PackScheduler = PackScheduler(),
+        removeItem: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
         isSupported: @escaping @MainActor (WallpaperKind) -> Bool = RendererFactory.supports
     ) {
         self.library = library
@@ -28,6 +36,7 @@ final class AppState {
         self.defaults = defaults
         self.scheduler = scheduler
         self.isSupported = isSupported
+        self.removeItem = removeItem
         self.selectedWallpaperID = defaults.string(forKey: Self.selectedWallpaperKey)
         self.selectedPackID = defaults.string(forKey: Self.selectedPackKey)
     }
@@ -73,6 +82,36 @@ final class AppState {
         }
     }
 
+    func moveToTrash(_ id: String) throws {
+        guard let wallpaper = library.wallpaper(withID: id) else {
+            throw WallpaperRemovalError(message: "\(id) is not in the library")
+        }
+        try removeItem(wallpaper.folder)
+        library.scan()
+        if selectedPackID == nil, selectedWallpaperID == id,
+           let next = library.wallpapers.first(where: supports) {
+            select(next.id)
+        }
+    }
+
+    func rename(_ id: String, to newName: String) throws {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            throw WallpaperRemovalError(message: "A wallpaper name can't be empty")
+        }
+        guard let wallpaper = library.wallpaper(withID: id) else {
+            throw WallpaperRemovalError(message: "\(id) is not in the library")
+        }
+        let file = wallpaper.folder.appending(path: WallpaperManifestParser.fileName)
+        guard var fields = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] else {
+            throw WallpaperRemovalError(message: "\(id)/wallpaper.json is not a JSON object")
+        }
+        fields["name"] = name
+        let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        try data.write(to: file, options: .atomic)
+        library.scan()
+    }
+
     func selectPack(_ id: String) {
         guard let pack = library.pack(withID: id) else { return }
         selectedPackID = id
@@ -83,7 +122,7 @@ final class AppState {
     private func show(_ id: String) {
         guard let wallpaper = library.wallpaper(withID: id), supports(wallpaper) else { return }
         remember(id)
-        if switcher.requested != wallpaper {
+        if !isRequested(wallpaper) {
             switcher.switchTo(wallpaper)
         }
     }
@@ -99,7 +138,7 @@ final class AppState {
         syncPack()
 
         if let id = selectedWallpaperID, let selected = library.wallpaper(withID: id), supports(selected) {
-            if switcher.requested != selected {
+            if !isRequested(selected) {
                 switcher.switchTo(selected)
             }
             return
@@ -121,6 +160,10 @@ final class AppState {
         if pack != scheduler.pack {
             scheduler.run(pack)
         }
+    }
+
+    private func isRequested(_ wallpaper: Wallpaper) -> Bool {
+        switcher.requested?.hasSameContent(as: wallpaper) ?? false
     }
 
     private func remember(_ id: String) {

@@ -5,6 +5,11 @@ struct LibraryTab: View {
     let thumbnails: Thumbnails
 
     private let columns = [GridItem(.adaptive(minimum: 180), spacing: 16)]
+    @State private var isDropTargeted = false
+    @State private var note: String?
+    @State private var pendingDeletion: Wallpaper?
+    @State private var renaming: Wallpaper?
+    @State private var newName = ""
 
     var body: some View {
         let wallpapers = appState.library.wallpapers
@@ -13,14 +18,18 @@ struct LibraryTab: View {
                 ContentUnavailableView(
                     "No wallpapers yet",
                     systemImage: "photo.on.rectangle",
-                    description: Text("Add a folder with a wallpaper.json to the wallpapers folder in your library.")
+                    description: Text("Drop a video, a .metal shader, or an .html page here to add it.")
                 )
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Double-click a wallpaper to show it.")
+                        Text("Double-click a wallpaper to show it, or right-click for more. Drop videos, shaders, or web pages here to add them.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                        if let note {
+                            Label(note, systemImage: "tray.and.arrow.down")
+                                .font(.callout)
+                        }
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(wallpapers) { wallpaper in
                                 WallpaperCard(
@@ -31,6 +40,22 @@ struct LibraryTab: View {
                                 .onTapGesture(count: 2) {
                                     appState.select(wallpaper.id)
                                 }
+                                .contextMenu {
+                                    Button("Show") {
+                                        appState.select(wallpaper.id)
+                                    }
+                                    Button("Rename…") {
+                                        newName = wallpaper.name
+                                        renaming = wallpaper
+                                    }
+                                    Button("Reveal in Finder") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([wallpaper.folder])
+                                    }
+                                    Divider()
+                                    Button("Move to Trash…", role: .destructive) {
+                                        pendingDeletion = wallpaper
+                                    }
+                                }
                             }
                         }
                     }
@@ -38,6 +63,62 @@ struct LibraryTab: View {
                 }
             }
         }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                    .padding(8)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            note = LibraryImporter.importWallpapers(urls, into: appState.library.wallpapersURL).summary
+            return true
+        } isTargeted: { isDropTargeted = $0 }
+        .confirmationDialog(
+            "Move “\(pendingDeletion?.name ?? "")” to the Trash?",
+            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+            presenting: pendingDeletion
+        ) { wallpaper in
+            Button("Move to Trash", role: .destructive) {
+                moveToTrash(wallpaper)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Its folder and files go to the Trash, where you can restore them. Packs that use it will skip it.")
+        }
+        .alert(
+            "Rename wallpaper",
+            isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
+            presenting: renaming
+        ) { wallpaper in
+            TextField("Name", text: $newName)
+            Button("Rename") {
+                rename(wallpaper)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This changes the name shown in Moonlet. The folder keeps its name, so packs still find it.")
+        }
+    }
+
+    private func rename(_ wallpaper: Wallpaper) {
+        do {
+            try appState.rename(wallpaper.id, to: newName)
+            note = nil
+        } catch {
+            note = "Could not rename \(wallpaper.name): \(error.localizedDescription)"
+        }
+        renaming = nil
+    }
+
+    private func moveToTrash(_ wallpaper: Wallpaper) {
+        do {
+            try appState.moveToTrash(wallpaper.id)
+            note = "Moved \(wallpaper.name) to the Trash."
+        } catch {
+            note = "Could not move \(wallpaper.name) to the Trash: \(error.localizedDescription)"
+        }
+        pendingDeletion = nil
     }
 }
 

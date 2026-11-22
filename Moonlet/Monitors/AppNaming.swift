@@ -33,9 +33,25 @@ enum AppNaming {
         return process.bundleID.isEmpty ? "Another app" : process.bundleID
     }
 
-    static func isIgnored(_ process: AudioProcess, ownPID: pid_t, ignoredBundleIDs: Set<String>) -> Bool {
-        process.pid == ownPID
-            || ignoredBundleIDs.contains(process.bundleID)
-            || (process.appName?.hasPrefix(ownHelperPrefix) ?? false)
+    static func isIgnored(
+        _ process: AudioProcess,
+        ownPID: pid_t,
+        ignoredBundleIDs: Set<String>,
+        ignoredAppNames: Set<String> = []
+    ) -> Bool {
+        if process.pid == ownPID || ignoredBundleIDs.contains(process.bundleID) {
+            return true
+        }
+        if process.appName?.hasPrefix(ownHelperPrefix) ?? false {
+            return true
+        }
+        if process.bundleID.hasSuffix(helperBundleSuffix),
+           ignoredBundleIDs.contains(String(process.bundleID.dropLast(helperBundleSuffix.count))) {
+            return true
+        }
+        if let appName = process.appName, appName.hasSuffix(webKitHelperSuffix) {
+            return ignoredAppNames.contains(String(appName.dropLast(webKitHelperSuffix.count)))
+        }
+        return false
     }
 }

@@ -54,9 +54,10 @@ final class PlaybackMonitor {
     }
 
     private func poll() {
+        let ignoredNames = Set(ignoredBundleIDs.compactMap(Self.runningAppName))
         let active = processes
             .filter { id, process in
-                !AppNaming.isIgnored(process, ownPID: ownPID, ignoredBundleIDs: ignoredBundleIDs)
+                !AppNaming.isIgnored(process, ownPID: ownPID, ignoredBundleIDs: ignoredBundleIDs, ignoredAppNames: ignoredNames)
                     && Self.isRunningOutput(id)
             }
             .map { AppNaming.displayName(for: $0.value, appNameForBundleID: Self.runningAppName) }
