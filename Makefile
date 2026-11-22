@@ -20,7 +20,7 @@ run: build stop
 	open $(APP)
 
 stop:
-	-pkill -x Moonlet
+	@-pkill -x Moonlet; while pgrep -x Moonlet > /dev/null; do sleep 0.1; done
 
 clean:
 	rm -rf build $(PROJECT)
