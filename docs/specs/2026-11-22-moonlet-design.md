@@ -46,6 +46,11 @@ The icon is a central planet with one circular orbit ring around it, and a
 small moon sitting on the ring. The menu bar version is a monochrome template
 image of the same shape.
 
+Both are drawn in code. `tools/RenderIcon` writes the app icon set, and
+`make icon` regenerates it. `MenuBarIcon` draws the 18-point template image at
+runtime. A tilted-ring variant was tried in Layer 9 and dropped in favor of the
+flat ring.
+
 ## 3. Approach
 
 Moonlet puts one borderless window on each screen at the desktop window level

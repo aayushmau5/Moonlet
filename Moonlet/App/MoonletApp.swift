@@ -7,8 +7,10 @@ struct MoonletApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Moonlet", systemImage: "moon.circle") {
+        MenuBarExtra {
             MenuPanel(appState: appDelegate.appState, audio: appDelegate.audio)
+        } label: {
+            Image(nsImage: MenuBarIcon.image)
         }
         .menuBarExtraStyle(.window)
 

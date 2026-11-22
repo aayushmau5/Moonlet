@@ -5,7 +5,7 @@ DESTINATION := platform=macOS,arch=arm64
 APP := $(DERIVED)/Build/Products/Debug/Moonlet.app
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -derivedDataPath $(DERIVED) -quiet
 
-.PHONY: generate build test snapshots run stop install clean
+.PHONY: generate build test snapshots run stop install icon clean
 
 generate:
 	xcodegen generate --quiet
@@ -32,6 +32,11 @@ install: generate
 	rm -rf /Applications/Moonlet.app
 	ditto $(DERIVED)/Build/Products/Release/Moonlet.app /Applications/Moonlet.app
 	@echo "Installed /Applications/Moonlet.app"
+
+icon:
+	mkdir -p build/tools
+	swiftc -swift-version 5 -O tools/RenderIcon/main.swift Moonlet/App/MenuBarIcon.swift -o build/tools/RenderIcon
+	build/tools/RenderIcon appiconset Moonlet/Assets.xcassets/AppIcon.appiconset
 
 clean:
 	rm -rf build $(PROJECT)
