@@ -6,6 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let audio: AudioController
     private let desktop: DesktopWindowController
     private let switcher: WallpaperSwitcher
+    private let otherAudio = OtherAudioDetector(monitor: PlaybackMonitor(ignoredBundleIDs: PlaybackMonitor.savedIgnoreList()))
+    private let system = SystemMonitor()
 
     override init() {
         let library = Library()
@@ -27,10 +29,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appState.library.addChangeHandler { [audio] in
             audio.libraryChanged()
         }
+        otherAudio.onChange = { [audio] app in
+            audio.setOtherAudio(app)
+        }
+        system.onChange = { [audio] text in
+            audio.setSystemPause(text)
+        }
 
         desktop.start()
         appState.start()
         startMusicWithoutWaitingIfNeeded()
+        otherAudio.start()
+        system.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

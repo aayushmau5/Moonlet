@@ -7,6 +7,7 @@ private final class ActiveChannel {
     var source: AudioSource
     let channel: AudioChannel
     var gain: Float = 0
+    var isPlaying = false
     var title: String?
     var fadeTask: Task<Void, Never>?
 
@@ -40,6 +41,9 @@ final class AudioController {
     private(set) var volume: Double
     private(set) var isShuffled: Bool
     private(set) var isUserPaused: Bool
+    private(set) var otherAudioApp: String?
+    private(set) var isOtherAudioOverridden = false
+    private(set) var systemPauseText: String?
     private(set) var nowPlaying: NowPlaying?
     private(set) var problems: [Problem] = []
     private(set) var isStarted = false
@@ -68,6 +72,24 @@ final class AudioController {
         self.volume = defaults.object(forKey: Self.volumeKey) as? Double ?? Self.defaultVolume
         self.isShuffled = defaults.bool(forKey: Self.shuffleKey)
         self.isUserPaused = defaults.bool(forKey: Self.pausedKey)
+    }
+
+    var isPaused: Bool {
+        isUserPaused || isOtherAudioPausing || systemPauseText != nil
+    }
+
+    var pauseDescription: String? {
+        if let systemPauseText {
+            return "Paused: \(systemPauseText)"
+        }
+        if isOtherAudioPausing, let otherAudioApp {
+            return "Paused: \(otherAudioApp) is playing"
+        }
+        return isUserPaused ? "Paused" : nil
+    }
+
+    private var isOtherAudioPausing: Bool {
+        otherAudioApp != nil && !isOtherAudioOverridden
     }
 
     @discardableResult
@@ -106,10 +128,33 @@ final class AudioController {
 
     @discardableResult
     func togglePause() -> Task<Void, Never> {
-        isUserPaused.toggle()
+        if isPaused {
+            isUserPaused = false
+            if isOtherAudioPausing {
+                isOtherAudioOverridden = true
+            }
+        } else {
+            isUserPaused = true
+        }
         defaults.set(isUserPaused, forKey: Self.pausedKey)
-        let paused = isUserPaused
-        return enqueue { await $0.applyPause(paused) }
+        return enqueue { await $0.applyPlayback() }
+    }
+
+    @discardableResult
+    func setOtherAudio(_ app: String?) -> Task<Void, Never> {
+        if app == nil {
+            isOtherAudioOverridden = false
+        }
+        otherAudioApp = app
+        logger.info("Other audio: \(app ?? "none", privacy: .public)")
+        return enqueue { await $0.applyPlayback() }
+    }
+
+    @discardableResult
+    func setSystemPause(_ text: String?) -> Task<Void, Never> {
+        systemPauseText = text
+        logger.info("System pause: \(text ?? "none", privacy: .public)")
+        return enqueue { await $0.applyPlayback() }
     }
 
     func setVolume(_ newVolume: Double) {
@@ -196,10 +241,11 @@ final class AudioController {
         apply(candidate)
         let fallback = source.defaultNowPlaying
         nowPlaying = NowPlaying(title: candidate.title ?? fallback.title, detail: fallback.detail)
-        logger.info("Music: now \(source.identity, privacy: .public)\(self.isUserPaused ? " (paused)" : "", privacy: .public)")
+        logger.info("Music: now \(source.identity, privacy: .public)\(self.isPaused ? " (paused)" : "", privacy: .public)")
 
-        if !isUserPaused {
+        if !isPaused {
             channel.play()
+            candidate.isPlaying = true
             fade(candidate, to: 1, over: fades.crossfade)
         }
     }
@@ -214,19 +260,23 @@ final class AudioController {
         failedIdentity = failed.source.identity
     }
 
-    private func applyPause(_ paused: Bool) async {
+    private func applyPlayback() async {
         guard let active else { return }
-        active.fadeTask?.cancel()
-        if paused {
-            await ramp(active, to: 0, over: fades.pauseOut)
-            if isUserPaused {
-                active.channel.pause()
-                logger.info("Music: paused")
-            }
-        } else {
+        if !isPaused, !active.isPlaying {
             active.channel.play()
+            active.isPlaying = true
             fade(active, to: 1, over: fades.resumeIn)
             logger.info("Music: resumed")
+        } else if isPaused, active.isPlaying {
+            active.fadeTask?.cancel()
+            await ramp(active, to: 0, over: fades.pauseOut)
+            if isPaused {
+                active.channel.pause()
+                active.isPlaying = false
+                logger.info("Music: \(self.pauseDescription ?? "paused", privacy: .public)")
+            } else {
+                fade(active, to: 1, over: fades.resumeIn)
+            }
         }
     }
 

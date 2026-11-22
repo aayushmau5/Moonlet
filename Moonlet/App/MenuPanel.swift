@@ -144,14 +144,14 @@ private struct MusicSection: View {
             Button {
                 audio.togglePause()
             } label: {
-                Image(systemName: audio.isUserPaused ? "play.fill" : "pause.fill")
+                Image(systemName: audio.isPaused ? "play.fill" : "pause.fill")
                     .font(.body)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(Color.primary.opacity(0.08)))
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .help(audio.isUserPaused ? "Play" : "Pause")
+            .help(audio.isPaused ? "Play" : "Pause")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(audio.nowPlaying?.title ?? "Nothing playing")
@@ -166,8 +166,9 @@ private struct MusicSection: View {
     }
 
     private var detail: String {
-        let source = audio.nowPlaying?.detail ?? "Pick a playlist below"
-        return audio.isUserPaused ? "Paused · \(source)" : source
+        let source = audio.nowPlaying?.detail ?? "Pick a source below"
+        guard let pause = audio.pauseDescription else { return source }
+        return "\(pause) · \(source)"
     }
 
     private var sourcePicker: some View {
