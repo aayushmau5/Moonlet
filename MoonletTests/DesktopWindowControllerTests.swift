@@ -3,42 +3,6 @@ import Testing
 @testable import Moonlet
 
 @MainActor
-final class FakeDisplayProvider: DisplayProvider {
-    var displays: [DisplayInfo]
-
-    init(_ displays: [DisplayInfo]) {
-        self.displays = displays
-    }
-}
-
-@MainActor
-final class FakeRenderer: WallpaperRenderer {
-    private(set) var attachedDisplayIDs: [CGDirectDisplayID] = []
-    private(set) var detachedDisplayIDs: [CGDirectDisplayID] = []
-    private(set) var views: [CGDirectDisplayID: NSView] = [:]
-    private(set) var isPlaying = false
-    private(set) var isTornDown = false
-
-    func load() async throws {}
-
-    func attach(to display: DisplayInfo) -> NSView {
-        attachedDisplayIDs.append(display.id)
-        let view = NSView(frame: NSRect(origin: .zero, size: display.frame.size))
-        views[display.id] = view
-        return view
-    }
-
-    func detach(from displayID: CGDirectDisplayID) {
-        detachedDisplayIDs.append(displayID)
-        views[displayID] = nil
-    }
-
-    func play() { isPlaying = true }
-    func pause() { isPlaying = false }
-    func tearDown() { isTornDown = true }
-}
-
-@MainActor
 struct DesktopWindowControllerTests {
     let laptop = DisplayInfo(id: 1, frame: NSRect(x: 100_000, y: 100_000, width: 1710, height: 1112))
     let external = DisplayInfo(id: 2, frame: NSRect(x: 102_000, y: 100_000, width: 2560, height: 1440))
@@ -80,60 +44,64 @@ struct DesktopWindowControllerTests {
         #expect(controller.windows[1]?.frame == resized.frame)
     }
 
-    @Test func showAttachesRendererToEveryWindowAndPlays() {
+    @Test func crossfadeShowsRendererOnEveryWindowAndPlays() async {
         let controller = DesktopWindowController(displayProvider: FakeDisplayProvider([laptop, external]))
         controller.rebuild()
         defer { controller.closeAll() }
         let renderer = FakeRenderer()
 
-        controller.show(renderer)
+        await controller.crossfade(to: renderer, duration: 0)
 
         #expect(Set(renderer.attachedDisplayIDs) == [1, 2])
-        #expect(controller.windows[1]?.contentView === renderer.views[1])
-        #expect(controller.windows[2]?.contentView === renderer.views[2])
+        #expect(controller.displayedView(on: 1) === renderer.views[1])
+        #expect(controller.displayedView(on: 2) === renderer.views[2])
+        #expect(controller.windows[1]?.contentView?.subviews == [renderer.views[1]!])
+        #expect(renderer.views[1]?.alphaValue == 1)
         #expect(renderer.isPlaying)
     }
 
-    @Test func newDisplayGetsCurrentRenderer() {
+    @Test func newDisplayGetsCurrentRenderer() async {
         let provider = FakeDisplayProvider([laptop])
         let controller = DesktopWindowController(displayProvider: provider)
         controller.rebuild()
         defer { controller.closeAll() }
         let renderer = FakeRenderer()
-        controller.show(renderer)
+        await controller.crossfade(to: renderer, duration: 0)
 
         provider.displays = [laptop, external]
         controller.rebuild()
 
-        #expect(controller.windows[2]?.contentView === renderer.views[2])
+        #expect(controller.displayedView(on: 2) === renderer.views[2])
+        #expect(controller.windows[2]?.contentView?.subviews == [renderer.views[2]!])
     }
 
-    @Test func unpluggedDisplayIsDetachedFromRenderer() {
+    @Test func unpluggedDisplayIsDetachedFromRenderer() async {
         let provider = FakeDisplayProvider([laptop, external])
         let controller = DesktopWindowController(displayProvider: provider)
         controller.rebuild()
         defer { controller.closeAll() }
         let renderer = FakeRenderer()
-        controller.show(renderer)
+        await controller.crossfade(to: renderer, duration: 0)
 
         provider.displays = [laptop]
         controller.rebuild()
 
         #expect(renderer.detachedDisplayIDs == [2])
+        #expect(controller.displayedView(on: 2) == nil)
     }
 
-    @Test func showTearsDownPreviousRenderer() {
+    @Test func crossfadeTearsDownPreviousRendererAndRemovesItsViews() async {
         let controller = DesktopWindowController(displayProvider: FakeDisplayProvider([laptop]))
         controller.rebuild()
         defer { controller.closeAll() }
         let first = FakeRenderer()
         let second = FakeRenderer()
 
-        controller.show(first)
-        controller.show(second)
+        await controller.crossfade(to: first, duration: 0)
+        await controller.crossfade(to: second, duration: 0)
 
         #expect(first.isTornDown)
         #expect(!second.isTornDown)
-        #expect(controller.windows[1]?.contentView === second.views[1])
+        #expect(controller.windows[1]?.contentView?.subviews == [second.views[1]!])
     }
 }

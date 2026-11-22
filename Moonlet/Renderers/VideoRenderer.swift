@@ -44,6 +44,15 @@ final class VideoRenderer: WallpaperRenderer {
         views[displayID] = nil
     }
 
+    func waitUntilReady() async {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while let layer = views.values.first?.playerLayer,
+              !layer.isReadyForDisplay,
+              ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+    }
+
     func play() {
         player.play()
     }

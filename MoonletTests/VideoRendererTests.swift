@@ -49,6 +49,14 @@ struct VideoRendererTests {
         }
     }
 
+    @Test func waitUntilReadyReturnsWithoutAttachedDisplays() async {
+        let renderer = VideoRenderer(url: anyURL)
+
+        await renderer.waitUntilReady()
+
+        #expect(renderer.attachedDisplayIDs.isEmpty)
+    }
+
     @Test func tearDownStopsPlaybackAndReleasesViews() {
         let renderer = VideoRenderer(url: anyURL)
         _ = renderer.attach(to: laptop)

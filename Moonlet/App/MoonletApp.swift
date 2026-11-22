@@ -6,10 +6,7 @@ struct MoonletApp: App {
 
     var body: some Scene {
         MenuBarExtra("Moonlet", systemImage: "moon.circle") {
-            Button("Quit Moonlet") {
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q")
+            MenuContent(appState: appDelegate.appState)
         }
     }
 }
