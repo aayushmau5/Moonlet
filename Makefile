@@ -4,8 +4,10 @@ DERIVED := build/DerivedData
 DESTINATION := platform=macOS,arch=arm64
 APP := $(DERIVED)/Build/Products/Debug/Moonlet.app
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -derivedDataPath $(DERIVED) -quiet
+RELEASE_APP := $(DERIVED)/Build/Products/Release/Moonlet.app
+RELEASE_DIR := build/release
 
-.PHONY: generate build test snapshots run stop install icon sounds examples videos clean
+.PHONY: generate build test snapshots run stop install release icon sounds examples videos clean
 
 generate:
 	xcodegen generate --quiet
@@ -27,11 +29,21 @@ stop:
 	@-pkill -x Moonlet; while pgrep -x Moonlet > /dev/null; do sleep 0.1; done
 
 install: generate
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -derivedDataPath $(DERIVED) -configuration Release -quiet build
+	$(XCODEBUILD) -configuration Release build
 	@$(MAKE) --no-print-directory stop
 	rm -rf /Applications/Moonlet.app
-	ditto $(DERIVED)/Build/Products/Release/Moonlet.app /Applications/Moonlet.app
+	ditto $(RELEASE_APP) /Applications/Moonlet.app
 	@echo "Installed /Applications/Moonlet.app"
+
+release: generate sounds
+	$(XCODEBUILD) -configuration Release build
+	rm -rf $(RELEASE_DIR)
+	mkdir -p $(RELEASE_DIR)
+	ditto -c -k --sequesterRsrc --keepParent $(RELEASE_APP) $(RELEASE_DIR)/Moonlet.zip
+	MOONLET_LIBRARY=$(RELEASE_DIR)/Moonlet tools/install-examples.sh examples build/sounds > /dev/null
+	ditto -c -k --keepParent $(RELEASE_DIR)/Moonlet $(RELEASE_DIR)/Moonlet-Examples.zip
+	rm -rf $(RELEASE_DIR)/Moonlet
+	@ls -lh $(RELEASE_DIR)
 
 icon:
 	mkdir -p build/tools
