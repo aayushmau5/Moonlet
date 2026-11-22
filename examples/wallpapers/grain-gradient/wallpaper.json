@@ -1,0 +1,6 @@
+{
+  "name": "Grain Gradient",
+  "type": "metal",
+  "source": "grain-gradient.metal",
+  "renderScale": 0.75
+}

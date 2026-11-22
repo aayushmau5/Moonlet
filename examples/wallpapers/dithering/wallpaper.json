@@ -1,0 +1,5 @@
+{
+  "name": "Dithering",
+  "type": "metal",
+  "source": "dithering.metal"
+}
