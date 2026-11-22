@@ -1,0 +1,22 @@
+{
+  "name": "Sky Cycle",
+  "mode": "timeOfDay",
+  "slots": [
+    {
+      "from": "06:00",
+      "wallpaper": "rain-on-glass"
+    },
+    {
+      "from": "12:00",
+      "wallpaper": "synthwave"
+    },
+    {
+      "from": "17:30",
+      "wallpaper": "ocean-at-dusk"
+    },
+    {
+      "from": "21:00",
+      "wallpaper": "nebula"
+    }
+  ]
+}

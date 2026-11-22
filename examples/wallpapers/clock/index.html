@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Clock</title>
+  <style>
+    html {
+      background: #0b1026;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, system-ui, sans-serif;
+      color: rgba(255, 255, 255, 0.88);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -12%;
+      will-change: transform;
+      transform: translate(var(--drift-x, 0%), var(--drift-y, 0%));
+      z-index: -1;
+      background:
+        radial-gradient(circle at 35% 40%, #3a2457 0%, transparent 40%),
+        radial-gradient(circle at 65% 60%, #0f4c5c 0%, transparent 40%),
+        linear-gradient(120deg, #0b1026, #1b2a49);
+    }
+
+    .clock {
+      text-align: center;
+    }
+
+    .time {
+      font-size: 9vw;
+      font-weight: 200;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .date {
+      margin-top: 1.6vw;
+      font-size: 1.6vw;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="clock">
+    <div class="time" id="time"></div>
+    <div class="date" id="date"></div>
+  </div>
+  <script>
+    const timeElement = document.getElementById("time");
+    const dateElement = document.getElementById("date");
+    const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const dateFormat = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+    function tick() {
+      const now = new Date();
+      timeElement.textContent = timeFormat.format(now);
+      dateElement.textContent = dateFormat.format(now);
+      setTimeout(tick, 1000 - now.getMilliseconds());
+    }
+
+    tick();
+
+    const driftPeriodSeconds = 180;
+    const driftStepMilliseconds = 100;
+
+    function drift() {
+      const phase = (performance.now() / 1000 / driftPeriodSeconds) * 2 * Math.PI;
+      const root = document.documentElement.style;
+      root.setProperty("--drift-x", `${(Math.sin(phase) * 8).toFixed(3)}%`);
+      root.setProperty("--drift-y", `${(Math.sin(phase * 0.7) * 5).toFixed(3)}%`);
+    }
+
+    drift();
+    setInterval(drift, driftStepMilliseconds);
+  </script>
+</body>
+</html>

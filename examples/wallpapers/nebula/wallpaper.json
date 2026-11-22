@@ -1,0 +1,6 @@
+{
+  "name": "Nebula",
+  "type": "metal",
+  "source": "nebula.metal",
+  "renderScale": 0.5
+}

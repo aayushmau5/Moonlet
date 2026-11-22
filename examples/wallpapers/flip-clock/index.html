@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Flip Clock</title>
+  <style>
+    html {
+      background: radial-gradient(ellipse at 50% 40%, #1d2333 0%, #0b0d14 70%);
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, system-ui, sans-serif;
+      color: #e9ecf2;
+    }
+
+    .clock {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3vw;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 1.2vw;
+    }
+
+    .separator {
+      display: flex;
+      flex-direction: column;
+      gap: 3.2vw;
+      margin: 0 1vw;
+    }
+
+    .separator span {
+      width: 1.1vw;
+      height: 1.1vw;
+      border-radius: 50%;
+      background: #4a5368;
+    }
+
+    .card {
+      position: relative;
+      width: 11vw;
+      height: 15vw;
+      font-size: 12vw;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      perspective: 60vw;
+    }
+
+    .half {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 50%;
+      overflow: hidden;
+      background: linear-gradient(#262b38, #1f2430);
+      backface-visibility: hidden;
+    }
+
+    .half span {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 15vw;
+      line-height: 15vw;
+      text-align: center;
+    }
+
+    .upper {
+      top: 0;
+      border-radius: 1.2vw 1.2vw 0 0;
+      transform-origin: 50% 100%;
+    }
+
+    .upper span {
+      top: 0;
+    }
+
+    .lower {
+      bottom: 0;
+      border-radius: 0 0 1.2vw 1.2vw;
+      transform-origin: 50% 0%;
+      background: linear-gradient(#1f2430, #1a1e28);
+      box-shadow: 0 1.4vw 2.6vw rgba(0, 0, 0, 0.45);
+    }
+
+    .lower span {
+      top: -7.5vw;
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(50% - 0.12vw);
+      height: 0.24vw;
+      background: #0b0d14;
+      z-index: 5;
+    }
+
+    .flip {
+      z-index: 3;
+      will-change: transform;
+    }
+
+    .meridiem {
+      align-self: flex-end;
+      margin-left: 1vw;
+      font-size: 2vw;
+      font-weight: 600;
+      color: #8a93a8;
+    }
+
+    .date {
+      font-size: 1.7vw;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #8a93a8;
+    }
+  </style>
+</head>
+<body>
+  <div class="clock">
+    <div class="row" id="row"></div>
+    <div class="date" id="date"></div>
+  </div>
+  <script>
+    const row = document.getElementById("row");
+    const dateLabel = document.getElementById("date");
+    const hourCycle = new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions().hourCycle;
+    const twelveHour = hourCycle === "h11" || hourCycle === "h12";
+    const dateFormat = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+    function makeHalf(className, value) {
+      const half = document.createElement("div");
+      half.className = `half ${className}`;
+      const digit = document.createElement("span");
+      digit.textContent = value;
+      half.appendChild(digit);
+      return half;
+    }
+
+    function makeCard() {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.upper = makeHalf("upper", "0");
+      card.lower = makeHalf("lower", "0");
+      card.append(card.upper, card.lower);
+      card.value = null;
+      return card;
+    }
+
+    function setHalf(half, value) {
+      half.firstChild.textContent = value;
+    }
+
+    function flipTo(card, value) {
+      if (card.value === value) {
+        return;
+      }
+      const previous = card.value;
+      card.value = value;
+      if (previous === null) {
+        setHalf(card.upper, value);
+        setHalf(card.lower, value);
+        return;
+      }
+
+      const fallingTop = makeHalf("upper flip", previous);
+      const risingBottom = makeHalf("lower flip", value);
+      risingBottom.style.transform = "rotateX(90deg)";
+      card.append(fallingTop, risingBottom);
+      setHalf(card.upper, value);
+
+      const half = 260;
+      fallingTop.animate(
+        [{ transform: "rotateX(0deg)" }, { transform: "rotateX(-90deg)" }],
+        { duration: half, easing: "ease-in", fill: "forwards" }
+      );
+      risingBottom.animate(
+        [{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }],
+        { duration: half, delay: half, easing: "ease-out", fill: "forwards" }
+      ).finished.then(() => {
+        setHalf(card.lower, value);
+        fallingTop.remove();
+        risingBottom.remove();
+      });
+    }
+
+    const cards = [makeCard(), makeCard(), makeCard(), makeCard()];
+    const separator = document.createElement("div");
+    separator.className = "separator";
+    separator.append(document.createElement("span"), document.createElement("span"));
+    const meridiem = document.createElement("div");
+    meridiem.className = "meridiem";
+    row.append(cards[0], cards[1], separator, cards[2], cards[3]);
+    if (twelveHour) {
+      row.append(meridiem);
+    }
+
+    function tick() {
+      const now = new Date();
+      let hours = now.getHours();
+      if (twelveHour) {
+        meridiem.textContent = hours < 12 ? "AM" : "PM";
+        hours = hours % 12 || 12;
+      }
+      const digits = String(hours).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0");
+      digits.split("").forEach((digit, index) => flipTo(cards[index], digit));
+      dateLabel.textContent = dateFormat.format(now);
+      setTimeout(tick, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 20);
+    }
+
+    tick();
+  </script>
+</body>
+</html>

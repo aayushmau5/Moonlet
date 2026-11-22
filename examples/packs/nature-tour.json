@@ -1,0 +1,19 @@
+{
+  "name": "Nature Tour",
+  "mode": "timer",
+  "intervalMinutes": 15,
+  "order": "shuffle",
+  "wallpapers": [
+    "rain-window",
+    "rain-on-lake",
+    "cloud-forest-rain",
+    "tropical-rain",
+    "forest-waterfall",
+    "mossy-waterfall",
+    "drifting-clouds",
+    "sea-sunset",
+    "milky-way",
+    "northern-lights",
+    "alpine-snow"
+  ]
+}
