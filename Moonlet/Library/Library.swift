@@ -12,6 +12,7 @@ final class Library {
     private(set) var wallpapers: [Wallpaper] = []
     private(set) var playlists: [Playlist] = []
     private(set) var streams: [RadioStream] = []
+    private(set) var packs: [Pack] = []
     private(set) var problems: [Problem] = []
 
     @ObservationIgnored private var changeHandlers: [() -> Void] = []
@@ -24,6 +25,14 @@ final class Library {
 
     var wallpapersURL: URL {
         rootURL.appending(path: "wallpapers", directoryHint: .isDirectory)
+    }
+
+    var packsURL: URL {
+        rootURL.appending(path: "packs", directoryHint: .isDirectory)
+    }
+
+    func pack(withID id: String) -> Pack? {
+        packs.first { $0.id == id }
     }
 
     var musicURL: URL {
@@ -55,10 +64,12 @@ final class Library {
 
         let music = MusicScanner.scan(musicFolder: musicURL)
         let radio = StreamsFile.load(from: rootURL.appending(path: StreamsFile.fileName))
+        let packScan = scanPacks(wallpaperIDs: Set(found.map(\.id)))
         wallpapers = found.sorted(by: Self.byName)
         playlists = music.playlists
         streams = radio.streams
-        problems = (issues + music.problems).sorted { $0.location < $1.location } + radio.problems
+        packs = packScan.packs
+        problems = (issues + music.problems + packScan.problems).sorted { $0.location < $1.location } + radio.problems
         logger.info("Scanned \(found.count) wallpapers, \(music.playlists.count) playlists, \(self.problems.count) problems")
         changeHandlers.forEach { $0() }
     }
@@ -77,6 +88,25 @@ final class Library {
     func stopWatching() {
         watcher?.stop()
         watcher = nil
+    }
+
+    private func scanPacks(wallpaperIDs: Set<String>) -> (packs: [Pack], problems: [Problem]) {
+        try? FileManager.default.createDirectory(at: packsURL, withIntermediateDirectories: true)
+        let files = ((try? FileManager.default.contentsOfDirectory(
+            at: packsURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []).filter { $0.pathExtension.lowercased() == "json" }
+
+        var packs: [Pack] = []
+        var problems: [Problem] = []
+        for file in files {
+            let result = PackParser.parse(file: file, wallpaperIDs: wallpaperIDs)
+            packs.append(contentsOf: result.pack.map { [$0] } ?? [])
+            problems.append(contentsOf: result.problems)
+        }
+        packs.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return (packs, problems)
     }
 
     private func wallpaperFolders() -> [URL] {

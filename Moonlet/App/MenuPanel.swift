@@ -65,8 +65,9 @@ private struct WallpaperSection: View {
             } else {
                 VStack(spacing: 1) {
                     ForEach(wallpapers) { wallpaper in
-                        WallpaperRow(
-                            wallpaper: wallpaper,
+                        ChoiceRow(
+                            title: wallpaper.name,
+                            detail: kindLabel(wallpaper.kind),
                             isSelected: appState.selectedWallpaperID == wallpaper.id
                         ) {
                             appState.select(wallpaper.id)
@@ -74,12 +75,38 @@ private struct WallpaperSection: View {
                     }
                 }
             }
+
+            let packs = appState.library.packs
+            if !packs.isEmpty {
+                SectionLabel(text: "Packs")
+                    .padding(.top, 6)
+                VStack(spacing: 1) {
+                    ForEach(packs) { pack in
+                        ChoiceRow(
+                            title: pack.name,
+                            detail: pack.summary,
+                            isSelected: appState.selectedPackID == pack.id
+                        ) {
+                            appState.selectPack(pack.id)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func kindLabel(_ kind: WallpaperKind) -> String {
+        switch kind {
+        case .video: "Video"
+        case .metal: "Shader"
+        case .web: "Web"
         }
     }
 }
 
-private struct WallpaperRow: View {
-    let wallpaper: Wallpaper
+private struct ChoiceRow: View {
+    let title: String
+    let detail: String
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
@@ -91,9 +118,9 @@ private struct WallpaperRow: View {
                     .font(.caption.weight(.bold))
                     .opacity(isSelected ? 1 : 0)
                     .frame(width: 12)
-                Text(wallpaper.name)
+                Text(title)
                 Spacer()
-                Text(kindLabel)
+                Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -107,14 +134,6 @@ private struct WallpaperRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
-    }
-
-    private var kindLabel: String {
-        switch wallpaper.kind {
-        case .video: "Video"
-        case .metal: "Shader"
-        case .web: "Web"
-        }
     }
 }
 

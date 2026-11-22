@@ -34,10 +34,7 @@ final class PlaylistChannel: AudioChannel, PlaylistControlling {
     }
 
     static func nextIndex(after current: Int, count: Int, shuffled: Bool) -> Int {
-        guard count > 1 else { return 0 }
-        guard shuffled else { return (current + 1) % count }
-        let pick = Int.random(in: 0..<(count - 1))
-        return pick >= current ? pick + 1 : pick
+        Rotation.nextIndex(after: current, count: count, shuffled: shuffled)
     }
 
     func load() async throws {

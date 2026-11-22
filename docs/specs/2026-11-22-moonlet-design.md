@@ -209,10 +209,16 @@ Timer pack:
   "order": "shuffle", "wallpapers": ["aurora", "clock", "rain-window"] }
 ```
 
-`order` is `shuffle` or `sequential`. Shuffle never repeats the same wallpaper
-twice in a row.
+`order` is `shuffle` or `sequential`, and defaults to `sequential`. Shuffle
+never repeats the same wallpaper twice in a row. `intervalMinutes` must be at
+least 1.
 
-Picking a single wallpaper from the menu stops the active pack.
+Picking a single wallpaper from the menu stops the active pack. The active pack
+is saved and resumes on launch. A timer pack restarts its rotation on launch.
+
+`PackScheduler` checks the active pack every 15 seconds and on wake from sleep,
+so a time-of-day pack switches within 15 seconds of its slot, even after the
+Mac slept through it.
 
 ### 5.4 Music and streams
 

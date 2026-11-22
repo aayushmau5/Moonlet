@@ -16,8 +16,8 @@ final class AppStateHarness {
         defaults = UserDefaults(suiteName: suiteName)!
     }
 
-    func makeState() -> AppState {
-        AppState(library: library, switcher: switcher, defaults: defaults) { $0 == .video }
+    func makeState(scheduler: PackScheduler = PackScheduler()) -> AppState {
+        AppState(library: library, switcher: switcher, defaults: defaults, scheduler: scheduler) { $0 == .video }
     }
 
     func cleanUp() {
