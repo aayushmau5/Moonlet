@@ -21,7 +21,7 @@ struct WallpaperReviewSnapshots {
 
         for wallpaper in scannedLibrary() where wallpaper.kind == .metal {
             guard case .file(let url) = wallpaper.source else { continue }
-            let renderer = MetalRenderer(sourceURL: url, device: device, watchesSource: false)
+            let renderer = MetalRenderer(sourceURL: url, device: device, imageURL: wallpaper.image, watchesSource: false)
             try await renderer.load()
             for time: Float in [0, 15, 30] {
                 let image = try renderer.snapshot(width: Int(size.width), height: Int(size.height), time: time)

@@ -1,7 +1,9 @@
 import AppKit
+import ImageIO
 import Metal
 import MetalKit
 import Testing
+import UniformTypeIdentifiers
 @testable import Moonlet
 
 @MainActor
@@ -24,6 +26,25 @@ final class ShaderFile {
     func makeRenderer() throws -> MetalRenderer {
         let device = try #require(MTLCreateSystemDefaultDevice())
         return MetalRenderer(sourceURL: url, device: device, watchesSource: false)
+    }
+
+    func writeImage(named name: String, top: RGBA, bottom: RGBA) throws -> URL {
+        let bytes: [UInt8] = [
+            UInt8(top.r), UInt8(top.g), UInt8(top.b), 255,
+            UInt8(bottom.r), UInt8(bottom.g), UInt8(bottom.b), 255,
+        ]
+        let provider = try #require(CGDataProvider(data: Data(bytes) as CFData))
+        let image = try #require(CGImage(
+            width: 1, height: 2, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+        ))
+        let url = folder.appending(path: name)
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+        return url
     }
 
     func remove() {
@@ -49,6 +70,14 @@ enum Shaders {
     static let uniforms = """
     fragment float4 wallpaper(VertexOut in [[stage_in]], constant Uniforms& u [[buffer(0)]]) {
         return float4(u.time / 4.0, u.resolution.x / 400.0, u.resolution.y / 400.0, 1.0);
+    }
+    """
+
+    static let image = """
+    constexpr sampler nearest(filter::nearest);
+    fragment float4 wallpaper(VertexOut in [[stage_in]], constant Uniforms& u [[buffer(0)]],
+                              texture2d<float> image [[texture(0)]]) {
+        return image.sample(nearest, in.uv);
     }
     """
 
@@ -243,5 +272,34 @@ struct MetalRendererTests {
         #expect(isClose(color.r, to: 128))
         #expect(isClose(color.g, to: 128))
         #expect(isClose(color.b, to: 64))
+    }
+
+    @Test func samplesTheImageWithTheSameOriginAsUV() async throws {
+        let file = try ShaderFile(Shaders.image)
+        defer { file.remove() }
+        let red = RGBA(r: 255, g: 0, b: 0)
+        let green = RGBA(r: 0, g: 255, b: 0)
+        let imageURL = try file.writeImage(named: "picture.png", top: red, bottom: green)
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = MetalRenderer(sourceURL: file.url, device: device, imageURL: imageURL, watchesSource: false)
+        try await renderer.load()
+
+        let image = try renderer.snapshot(width: 10, height: 10, time: 0)
+
+        #expect(pixel(image, x: 5, y: 1) == red)
+        #expect(pixel(image, x: 5, y: 8) == green)
+    }
+
+    @Test func reportsAnImageThatWillNotLoad() async throws {
+        let file = try ShaderFile(Shaders.image)
+        defer { file.remove() }
+        let imageURL = file.folder.appending(path: "broken.png")
+        try Data("not a picture".utf8).write(to: imageURL)
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = MetalRenderer(sourceURL: file.url, device: device, imageURL: imageURL, watchesSource: false)
+
+        await #expect(throws: ShaderError.self) {
+            try await renderer.load()
+        }
     }
 }

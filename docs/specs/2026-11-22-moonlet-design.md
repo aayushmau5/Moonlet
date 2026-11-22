@@ -157,12 +157,14 @@ wallpaper's ID. Each folder has a `wallpaper.json`:
 | `soundtrack` | no | A file in the folder, or `"video"` to use the video's own audio track |
 | `volume` | no | 0 to 1, default 1. Scales the soundtrack against the master volume. |
 | `renderScale` | no | 0.25 to 1, default 1. Metal wallpapers render at this fraction of the screen's resolution and are scaled up, which cuts GPU work and memory for soft or heavy shaders. Ignored by video and web wallpapers. |
+| `image` | no | Metal only. A `.png`, `.jpg`, or `.heic` file in the folder that the shader can sample. See section 5.2. |
 
 Supported files:
 
 - Video: `.mp4`, `.mov` (H.264 or HEVC)
 - Audio: `.mp3`, `.m4a`, `.aac`, `.flac`, `.wav`
 - Shaders: `.metal`
+- Shader images: `.png`, `.jpg`, `.jpeg`, `.heic`
 - Web: `.html`
 
 Without a `soundtrack`, a video plays muted, and the selected playlist or
@@ -192,6 +194,23 @@ fragment float4 wallpaper(VertexOut in [[stage_in]],
 
 `VertexOut` provides `float2 uv` in the 0 to 1 range. Moonlet compiles the
 combined source at runtime with `MTLDevice.makeLibrary(source:options:)`.
+
+When the manifest sets `image`, Moonlet loads it once with mipmaps and binds
+it at `texture(0)`. A shader that wants it adds a parameter:
+
+```metal
+constexpr sampler linear(filter::linear, mip_filter::linear);
+
+fragment float4 wallpaper(VertexOut in [[stage_in]],
+                          constant Uniforms& u [[buffer(0)]],
+                          texture2d<float> image [[texture(0)]]) {
+    return image.sample(linear, in.uv);
+}
+```
+
+The image is loaded with a bottom-left origin, so `in.uv` samples it upright.
+The shader handles aspect ratio itself, using `image.get_width()` and
+`image.get_height()`. Saving a new version of the image reloads it.
 
 ### 5.3 Packs
 

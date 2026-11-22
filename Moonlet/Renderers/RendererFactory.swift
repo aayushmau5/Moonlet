@@ -13,7 +13,12 @@ enum RendererFactory {
             return VideoRenderer(url: url)
         case (.metal, .file(let url)):
             guard let device = MTLCreateSystemDefaultDevice() else { return nil }
-            return MetalRenderer(sourceURL: url, device: device, renderScale: wallpaper.renderScale)
+            return MetalRenderer(
+                sourceURL: url,
+                device: device,
+                renderScale: wallpaper.renderScale,
+                imageURL: wallpaper.image
+            )
         case (.web, let source):
             return WebRenderer(source: source, folder: wallpaper.folder)
         default:

@@ -9,13 +9,16 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
 
     var onProblem: ((String?) -> Void)?
     private(set) var pipeline: MTLRenderPipelineState?
+    private(set) var image: MTLTexture?
 
     private let sourceURL: URL
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue?
     private let watchesSource: Bool
     private let renderScale: Double
+    private let imageURL: URL?
     private var loadedSource: String?
+    private var loadedImageDate: Date?
     private var views: [CGDirectDisplayID: MTKView] = [:]
     private var clock = ShaderClock()
     private var isPlaying = false
@@ -31,10 +34,17 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         clock.isRunning
     }
 
-    init(sourceURL: URL, device: MTLDevice, renderScale: Double = 1, watchesSource: Bool = true) {
+    init(
+        sourceURL: URL,
+        device: MTLDevice,
+        renderScale: Double = 1,
+        imageURL: URL? = nil,
+        watchesSource: Bool = true
+    ) {
         self.sourceURL = sourceURL
         self.device = device
         self.renderScale = renderScale
+        self.imageURL = imageURL
         self.commandQueue = device.makeCommandQueue()
         self.watchesSource = watchesSource
         super.init()
@@ -44,12 +54,17 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         let source = try readSource()
         pipeline = try await makePipeline(source: source)
         loadedSource = source
+        if let imageURL {
+            loadedImageDate = modificationDate(of: imageURL)
+            image = try await loadImage(from: imageURL)
+        }
         if watchesSource {
             startWatching()
         }
     }
 
     func reloadIfChanged() async {
+        await reloadImageIfChanged()
         guard let source = try? readSource(), source != loadedSource else { return }
         loadedSource = source
         do {
@@ -60,6 +75,42 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         } catch {
             guard loadedSource == source else { return }
             onProblem?(error.localizedDescription)
+        }
+    }
+
+    private func reloadImageIfChanged() async {
+        guard let imageURL, image != nil else { return }
+        let date = modificationDate(of: imageURL)
+        guard date != loadedImageDate else { return }
+        loadedImageDate = date
+        do {
+            let newImage = try await loadImage(from: imageURL)
+            guard loadedImageDate == date, self.image != nil else { return }
+            self.image = newImage
+            onProblem?(nil)
+        } catch {
+            guard loadedImageDate == date else { return }
+            onProblem?(error.localizedDescription)
+        }
+    }
+
+    private func modificationDate(of url: URL) -> Date? {
+        try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
+    private func loadImage(from url: URL) async throws -> MTLTexture {
+        let loader = MTKTextureLoader(device: device)
+        let options: [MTKTextureLoader.Option: Any] = [
+            .origin: MTKTextureLoader.Origin.bottomLeft,
+            .SRGB: false,
+            .generateMipmaps: true,
+            .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+            .textureStorageMode: MTLStorageMode.private.rawValue,
+        ]
+        do {
+            return try await loader.newTexture(URL: url, options: options)
+        } catch {
+            throw ShaderError(message: "Could not load image \(url.lastPathComponent)")
         }
     }
 
@@ -126,6 +177,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
             detach(from: id)
         }
         pipeline = nil
+        image = nil
     }
 
     func snapshot(width: Int, height: Int, time: Float) throws -> CGImage {
@@ -198,6 +250,9 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) else { return }
         encoder.setRenderPipelineState(pipeline)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ShaderUniforms>.stride, index: 0)
+        if let image {
+            encoder.setFragmentTexture(image, index: 0)
+        }
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         encoder.endEncoding()
     }

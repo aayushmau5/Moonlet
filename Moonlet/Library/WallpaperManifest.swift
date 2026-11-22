@@ -11,6 +11,7 @@ private struct RawManifest: Decodable {
     let soundtrack: String?
     let volume: Double?
     let renderScale: Double?
+    let image: String?
 }
 
 enum WallpaperManifestParser {
@@ -22,6 +23,7 @@ enum WallpaperManifestParser {
         .web: ["html", "htm"],
     ]
     private static let audioExtensions: Set<String> = ["mp3", "m4a", "aac", "flac", "wav"]
+    private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "heic"]
 
     static func parse(folder: URL) -> Result<Wallpaper, ManifestProblem> {
         Result { try parseOrThrow(folder: folder) }
@@ -54,6 +56,7 @@ enum WallpaperManifestParser {
         guard (0.25...1).contains(renderScale) else {
             throw ManifestProblem(message: #""renderScale" must be between 0.25 and 1"#)
         }
+        let image = try raw.image.map { try resolveImage($0, kind: kind, folder: folder) }
 
         return Wallpaper(
             id: folder.lastPathComponent,
@@ -63,7 +66,8 @@ enum WallpaperManifestParser {
             soundtrack: soundtrack,
             volume: volume,
             folder: folder,
-            renderScale: renderScale
+            renderScale: renderScale,
+            image: image
         )
     }
 
@@ -115,6 +119,17 @@ enum WallpaperManifestParser {
             throw ManifestProblem(message: "Soundtrack must be an audio file (mp3, m4a, aac, flac, or wav)")
         }
         return .file(file)
+    }
+
+    private static func resolveImage(_ value: String, kind: WallpaperKind, folder: URL) throws -> URL {
+        guard kind == .metal else {
+            throw ManifestProblem(message: #""image" only works for metal wallpapers"#)
+        }
+        let file = try fileInside(folder, named: value, label: "Image")
+        guard imageExtensions.contains(file.pathExtension.lowercased()) else {
+            throw ManifestProblem(message: "Image must be a png, jpg, or heic file")
+        }
+        return file
     }
 
     private static func fileInside(_ folder: URL, named name: String, label: String) throws -> URL {

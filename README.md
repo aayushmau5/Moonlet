@@ -85,7 +85,7 @@ A wallpaper is a folder with a `wallpaper.json` and its files:
 }
 ```
 
-`type` is `video` (`.mp4` or `.mov`), `metal` (a `.metal` file), or `web` (an `.html` file or a URL). `soundtrack` is optional. A Metal shader defines one fragment function called `wallpaper`, and saving the file updates the desktop right away. See [`examples/wallpapers`](examples/wallpapers) for working shaders.
+`type` is `video` (`.mp4` or `.mov`), `metal` (a `.metal` file), or `web` (an `.html` file or a URL). `soundtrack` is optional. A Metal shader defines one fragment function called `wallpaper`, and saving the file updates the desktop right away. A Metal wallpaper can also set `"image"` to a photo in its folder, and the shader samples it at `texture(0)` to animate or restyle it. See [`examples/wallpapers`](examples/wallpapers) for working shaders.
 
 A pack switches wallpapers by time of day or on a timer:
 

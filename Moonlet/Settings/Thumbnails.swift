@@ -10,7 +10,8 @@ final class Thumbnails {
 
     func image(for wallpaper: Wallpaper) async -> NSImage? {
         guard case .file(let source) = wallpaper.source else { return nil }
-        let key = "\(wallpaper.id)|\(source.path)|\(Self.modificationDate(of: source)?.timeIntervalSince1970 ?? 0)"
+        let imageDate = wallpaper.image.flatMap(Self.modificationDate(of:))?.timeIntervalSince1970 ?? 0
+        let key = "\(wallpaper.id)|\(source.path)|\(Self.modificationDate(of: source)?.timeIntervalSince1970 ?? 0)|\(imageDate)"
         if let cached = cache[key] {
             return cached
         }
@@ -20,7 +21,7 @@ final class Thumbnails {
         case .video:
             image = await videoFrame(from: source)
         case .metal:
-            image = await shaderFrame(from: source)
+            image = await shaderFrame(from: source, image: wallpaper.image)
         case .web:
             image = nil
         }
@@ -41,9 +42,9 @@ final class Thumbnails {
         return NSImage(cgImage: frame, size: NSSize(width: frame.width, height: frame.height))
     }
 
-    private func shaderFrame(from url: URL) async -> NSImage? {
+    private func shaderFrame(from url: URL, image: URL?) async -> NSImage? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
-        let renderer = MetalRenderer(sourceURL: url, device: device, watchesSource: false)
+        let renderer = MetalRenderer(sourceURL: url, device: device, imageURL: image, watchesSource: false)
         guard (try? await renderer.load()) != nil,
               let frame = try? renderer.snapshot(width: Int(Self.size.width), height: Int(Self.size.height), time: 12) else {
             return nil

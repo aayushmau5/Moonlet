@@ -104,6 +104,20 @@ struct WallpaperManifestTests {
         #expect(try WallpaperManifestParser.parse(folder: plain).get().renderScale == 1)
     }
 
+    @Test func readsAnOptionalImageForMetal() throws {
+        let library = try TestLibraryFolder()
+        defer { library.remove() }
+        let folder = try library.addWallpaper(
+            "canopy",
+            manifest: #"{ "name": "Canopy", "type": "metal", "source": "c.metal", "image": "canopy.jpg" }"#,
+            files: ["c.metal", "canopy.jpg"]
+        )
+        let plain = try library.addVideo("plain", name: "Plain")
+
+        #expect(try WallpaperManifestParser.parse(folder: folder).get().image == folder.appending(path: "canopy.jpg"))
+        #expect(try WallpaperManifestParser.parse(folder: plain).get().image == nil)
+    }
+
     static let invalidCases: [InvalidManifestCase] = [
         .init(label: "no manifest", manifest: nil, files: [], expectedMessage: "Missing wallpaper.json"),
         .init(label: "bad JSON", manifest: "{ name: ", files: [], expectedMessage: "not valid JSON"),
@@ -121,6 +135,9 @@ struct WallpaperManifestTests {
         .init(label: "soundtrack not audio", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "soundtrack": "a.txt" }"#, files: ["a.mp4", "a.txt"], expectedMessage: "audio file"),
         .init(label: "volume too high", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "volume": 1.5 }"#, files: ["a.mp4"], expectedMessage: "between 0 and 1"),
         .init(label: "render scale too small", manifest: #"{ "name": "A", "type": "metal", "source": "a.metal", "renderScale": 0.1 }"#, files: ["a.metal"], expectedMessage: #""renderScale" must be between 0.25 and 1"#),
+        .init(label: "image on video", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "image": "a.png" }"#, files: ["a.mp4", "a.png"], expectedMessage: #""image" only works for metal"#),
+        .init(label: "image not found", manifest: #"{ "name": "A", "type": "metal", "source": "a.metal", "image": "a.png" }"#, files: ["a.metal"], expectedMessage: #"Image file "a.png" not found"#),
+        .init(label: "image not a picture", manifest: #"{ "name": "A", "type": "metal", "source": "a.metal", "image": "a.txt" }"#, files: ["a.metal", "a.txt"], expectedMessage: "png, jpg, or heic"),
         .init(label: "volume wrong type", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "volume": "loud" }"#, files: ["a.mp4"], expectedMessage: #""volume" has the wrong type"#),
     ]
 
