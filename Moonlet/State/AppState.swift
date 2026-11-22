@@ -61,6 +61,18 @@ final class AppState {
         switcher.switchTo(wallpaper)
     }
 
+    func moveLibrary(to folder: URL) {
+        defaults.set(folder.path, forKey: Library.rootPathKey)
+        library.relocate(to: folder)
+        if let id = selectedPackID, library.pack(withID: id) == nil {
+            stopPack()
+        }
+        let current = selectedWallpaperID.flatMap(library.wallpaper(withID:))
+        if current == nil, let first = library.wallpapers.first(where: supports) {
+            select(first.id)
+        }
+    }
+
     func selectPack(_ id: String) {
         guard let pack = library.pack(withID: id) else { return }
         selectedPackID = id

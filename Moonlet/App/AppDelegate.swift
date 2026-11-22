@@ -4,6 +4,8 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let appState: AppState
     let audio: AudioController
+    let loginItem = LoginItem()
+    let thumbnails = Thumbnails()
     private let desktop: DesktopWindowController
     private let switcher: WallpaperSwitcher
     private let otherAudio = OtherAudioDetector(monitor: PlaybackMonitor(ignoredBundleIDs: PlaybackMonitor.savedIgnoreList()))
@@ -13,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isSystemPaused = false
 
     override init() {
-        let library = Library()
+        let library = Library(rootURL: Library.savedRootURL())
         let desktop = DesktopWindowController(displayProvider: SystemDisplayProvider())
         let switcher = WallpaperSwitcher(desktop: desktop)
         self.desktop = desktop

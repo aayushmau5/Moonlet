@@ -59,23 +59,51 @@ struct WallpaperReviewSnapshots {
         appState.start(watching: false)
         let audio = AudioController(library: library, defaults: UserDefaults(suiteName: "moonlet-panel-snapshot")!)
 
+        try await render(MenuPanel(appState: appState, audio: audio), size: nil, name: "panel", to: output)
+    }
+
+    @Test func renderSettingsTabs() async throws {
+        let output = try outputDirectory()
+        let library = Library()
+        let desktop = DesktopWindowController(displayProvider: FakeDisplayProvider([]))
+        let appState = AppState(library: library, switcher: WallpaperSwitcher(desktop: desktop))
+        appState.start(watching: false)
+        let audio = AudioController(library: library, defaults: UserDefaults(suiteName: "moonlet-settings-snapshot")!)
+        let size = NSSize(width: 680, height: 440)
+        let thumbnails = Thumbnails()
+        let sampleProblems = [
+            Problem(location: "wallpapers/aurora", message: "line 39: no member named 'tme' in 'Uniforms'; did you mean 'time'?"),
+            Problem(location: "streams.json", message: "Stream stopped: A server with the specified hostname could not be found."),
+        ]
+
+        try await render(
+            SettingsWindow(appState: appState, audio: audio, loginItem: LoginItem(), thumbnails: thumbnails),
+            size: NSSize(width: 680, height: 480),
+            name: "settings-window",
+            to: output
+        )
+        try await render(GeneralTab(appState: appState, loginItem: LoginItem()), size: size, name: "settings-general", to: output)
+        try await render(LibraryTab(appState: appState, thumbnails: thumbnails), size: size, name: "settings-library", to: output, settle: .seconds(3))
+        try await render(ProblemsTab(problems: sampleProblems), size: size, name: "settings-problems", to: output)
+        try await render(ProblemsTab(problems: []), size: size, name: "settings-no-problems", to: output)
+    }
+
+    private func render<V: View>(_ view: V, size: NSSize?, name: String, to output: URL, settle: Duration = .milliseconds(300)) async throws {
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let background = appearance == .aqua ? Color(white: 0.96) : Color(white: 0.16)
-            let host = NSHostingView(rootView: MenuPanel(appState: appState, audio: audio).background(background))
+            let host = NSHostingView(rootView: view.background(background))
             host.appearance = NSAppearance(named: appearance)
-            let size = host.fittingSize
-            host.frame = NSRect(origin: .zero, size: size)
+            host.frame = NSRect(origin: .zero, size: size ?? host.fittingSize)
             let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
             window.appearance = NSAppearance(named: appearance)
-            window.backgroundColor = appearance == .aqua ? .windowBackgroundColor : NSColor(white: 0.16, alpha: 1)
             window.contentView = host
             host.layoutSubtreeIfNeeded()
-            try await Task.sleep(for: .milliseconds(300))
+            try await Task.sleep(for: settle)
 
             let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
             host.cacheDisplay(in: host.bounds, to: rep)
             let image = try #require(rep.cgImage)
-            try save(image, to: output.appending(path: "panel-\(appearance == .aqua ? "light" : "dark").png"))
+            try save(image, to: output.appending(path: "\(name)-\(appearance == .aqua ? "light" : "dark").png"))
             window.close()
         }
     }

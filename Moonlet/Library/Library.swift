@@ -7,8 +7,14 @@ import os
 final class Library {
     static let defaultRootURL = FileManager.default.homeDirectoryForCurrentUser
         .appending(path: "Moonlet", directoryHint: .isDirectory)
+    static let rootPathKey = "libraryPath"
 
-    let rootURL: URL
+    static func savedRootURL(in defaults: UserDefaults = .standard) -> URL {
+        guard let path = defaults.string(forKey: rootPathKey) else { return defaultRootURL }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    private(set) var rootURL: URL
     private(set) var wallpapers: [Wallpaper] = []
     private(set) var playlists: [Playlist] = []
     private(set) var streams: [RadioStream] = []
@@ -72,6 +78,17 @@ final class Library {
         problems = (issues + music.problems + packScan.problems).sorted { $0.location < $1.location } + radio.problems
         logger.info("Scanned \(found.count) wallpapers, \(music.playlists.count) playlists, \(self.problems.count) problems")
         changeHandlers.forEach { $0() }
+    }
+
+    func relocate(to newRoot: URL) {
+        let wasWatching = watcher != nil
+        stopWatching()
+        rootURL = newRoot
+        logger.info("Library moved to \(newRoot.path, privacy: .public)")
+        scan()
+        if wasWatching {
+            startWatching()
+        }
     }
 
     func startWatching() {

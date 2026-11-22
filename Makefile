@@ -5,7 +5,7 @@ DESTINATION := platform=macOS,arch=arm64
 APP := $(DERIVED)/Build/Products/Debug/Moonlet.app
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -derivedDataPath $(DERIVED) -quiet
 
-.PHONY: generate build test snapshots run stop clean
+.PHONY: generate build test snapshots run stop install clean
 
 generate:
 	xcodegen generate --quiet
@@ -25,6 +25,13 @@ run: build stop
 
 stop:
 	@-pkill -x Moonlet; while pgrep -x Moonlet > /dev/null; do sleep 0.1; done
+
+install: generate
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -derivedDataPath $(DERIVED) -configuration Release -quiet build
+	@$(MAKE) --no-print-directory stop
+	rm -rf /Applications/Moonlet.app
+	ditto $(DERIVED)/Build/Products/Release/Moonlet.app /Applications/Moonlet.app
+	@echo "Installed /Applications/Moonlet.app"
 
 clean:
 	rm -rf build $(PROJECT)

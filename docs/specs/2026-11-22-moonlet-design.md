@@ -523,6 +523,10 @@ volume slider. It contains:
   before touching `AppState`.
 - No App Sandbox, so Moonlet can read and watch the library folder freely.
 - Signing: "Sign to Run Locally". No paid developer account needed.
+- `make install` builds the Release configuration and copies it to
+  `/Applications/Moonlet.app`. Launch at login is turned on from that installed
+  copy, because a login item points at one specific copy of the app. The
+  settings window warns when it runs from a development build.
 - `Info.plist`: `LSUIElement = YES`.
 
 ## 10. Testing

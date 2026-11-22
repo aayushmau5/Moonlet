@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuPanel: View {
     let appState: AppState
     let audio: AudioController
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -21,22 +22,56 @@ struct MenuPanel: View {
     }
 
     private var problems: [Problem] {
-        (appState.problems + audio.problems).sorted { $0.location < $1.location }
+        ProblemList.combined(appState, audio)
     }
 
     private var footer: some View {
         HStack {
-            Button("Open Library Folder") {
-                NSWorkspace.shared.open(appState.library.rootURL)
+            Button {
+                openWindow(id: MoonletApp.settingsWindowID)
+                NSApplication.shared.activate()
+            } label: {
+                Label("Settings", systemImage: "gearshape")
             }
+            .keyboardShortcut(",")
             Spacer()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(HoverButtonStyle())
         .font(.callout)
+        .padding(.horizontal, -8)
+    }
+}
+
+private struct HoverButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HoverButton(configuration: configuration)
+    }
+}
+
+private struct HoverButton: View {
+    let configuration: ButtonStyleConfiguration
+    @State private var isHovered = false
+
+    var body: some View {
+        configuration.label
+            .foregroundStyle(isHovered ? .primary : .secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(highlight))
+            )
+            .contentShape(Rectangle())
+            .onHover { isHovered = $0 }
+    }
+
+    private var highlight: Double {
+        if configuration.isPressed { return 0.14 }
+        return isHovered ? 0.08 : 0
     }
 }
 
