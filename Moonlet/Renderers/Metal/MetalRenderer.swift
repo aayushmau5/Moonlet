@@ -17,6 +17,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     private let watchesSource: Bool
     private let renderScale: Double
     private let imageURL: URL?
+    private let pixelated: Bool
     private var loadedSource: String?
     private var loadedImageDate: Date?
     private var views: [CGDirectDisplayID: MTKView] = [:]
@@ -39,12 +40,14 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         device: MTLDevice,
         renderScale: Double = 1,
         imageURL: URL? = nil,
+        pixelated: Bool = false,
         watchesSource: Bool = true
     ) {
         self.sourceURL = sourceURL
         self.device = device
         self.renderScale = renderScale
         self.imageURL = imageURL
+        self.pixelated = pixelated
         self.commandQueue = device.makeCommandQueue()
         self.watchesSource = watchesSource
         super.init()
@@ -117,6 +120,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     func attach(to display: DisplayInfo) -> NSView {
         let view = ScaledMetalView(frame: NSRect(origin: .zero, size: display.frame.size), device: device)
         view.renderScale = renderScale
+        view.pixelated = pixelated
         view.colorPixelFormat = Self.pixelFormat
         view.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         view.framebufferOnly = true
@@ -326,6 +330,12 @@ final class ScaledMetalView: MTKView {
         didSet {
             autoResizeDrawable = renderScale >= 1
             updateDrawableSize()
+        }
+    }
+
+    var pixelated = false {
+        didSet {
+            layer?.magnificationFilter = pixelated ? .nearest : .linear
         }
     }
 

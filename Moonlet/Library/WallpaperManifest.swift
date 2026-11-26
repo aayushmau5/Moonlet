@@ -12,6 +12,7 @@ private struct RawManifest: Decodable {
     let volume: Double?
     let renderScale: Double?
     let image: String?
+    let pixelated: Bool?
 }
 
 enum WallpaperManifestParser {
@@ -57,6 +58,10 @@ enum WallpaperManifestParser {
             throw ManifestProblem(message: #""renderScale" must be between 0.25 and 1"#)
         }
         let image = try raw.image.map { try resolveImage($0, kind: kind, folder: folder) }
+        let pixelated = raw.pixelated ?? false
+        if pixelated && kind != .metal {
+            throw ManifestProblem(message: #""pixelated" only works for metal wallpapers"#)
+        }
 
         return Wallpaper(
             id: folder.lastPathComponent,
@@ -67,7 +72,8 @@ enum WallpaperManifestParser {
             volume: volume,
             folder: folder,
             renderScale: renderScale,
-            image: image
+            image: image,
+            pixelated: pixelated
         )
     }
 

@@ -168,6 +168,24 @@ struct MetalRendererTests {
         #expect(renderer.attachedDisplayIDs.isEmpty)
     }
 
+    @Test func pixelatedWallpapersUpscaleWithoutSmoothing() async throws {
+        let file = try ShaderFile(Shaders.solid(0, 0, 1))
+        defer { file.remove() }
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let pixelated = MetalRenderer(sourceURL: file.url, device: device, renderScale: 0.5, pixelated: true, watchesSource: false)
+        let smooth = MetalRenderer(sourceURL: file.url, device: device, renderScale: 0.5, watchesSource: false)
+        try await pixelated.load()
+        try await smooth.load()
+
+        let pixelatedView = try #require(pixelated.attach(to: laptop) as? MTKView)
+        let smoothView = try #require(smooth.attach(to: laptop) as? MTKView)
+
+        #expect(pixelatedView.layer?.magnificationFilter == .nearest)
+        #expect(smoothView.layer?.magnificationFilter == .linear)
+        pixelated.tearDown()
+        smooth.tearDown()
+    }
+
     @Test func rendersAtTheRequestedScale() async throws {
         let file = try ShaderFile(Shaders.solid(0, 0, 1))
         defer { file.remove() }

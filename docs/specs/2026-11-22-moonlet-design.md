@@ -157,6 +157,7 @@ wallpaper's ID. Each folder has a `wallpaper.json`:
 | `soundtrack` | no | A file in the folder, or `"video"` to use the video's own audio track |
 | `volume` | no | 0 to 1, default 1. Scales the soundtrack against the master volume. |
 | `renderScale` | no | 0.25 to 1, default 1. Metal wallpapers render at this fraction of the screen's resolution and are scaled up, which cuts GPU work and memory for soft or heavy shaders. Ignored by video and web wallpapers. |
+| `pixelated` | no | Metal only. `true` upscales a reduced `renderScale` with nearest-neighbor sampling instead of smoothing, so dithered and pixel-art shaders stay crisp. Use it with a `renderScale` of 0.5 or 0.25. Default `false`. |
 | `image` | no | Metal only. A `.png`, `.jpg`, or `.heic` file in the folder that the shader can sample. See section 5.2. |
 
 Supported files:

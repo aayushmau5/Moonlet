@@ -118,6 +118,24 @@ struct WallpaperManifestTests {
         #expect(try WallpaperManifestParser.parse(folder: plain).get().image == nil)
     }
 
+    @Test func readsAnOptionalPixelatedFlag() throws {
+        let library = try TestLibraryFolder()
+        defer { library.remove() }
+        let pixelated = try library.addWallpaper(
+            "leaves",
+            manifest: #"{ "name": "Leaves", "type": "metal", "source": "l.metal", "pixelated": true }"#,
+            files: ["l.metal"]
+        )
+        let plain = try library.addWallpaper(
+            "aurora",
+            manifest: #"{ "name": "Aurora", "type": "metal", "source": "a.metal" }"#,
+            files: ["a.metal"]
+        )
+
+        #expect(try WallpaperManifestParser.parse(folder: pixelated).get().pixelated)
+        #expect(try !WallpaperManifestParser.parse(folder: plain).get().pixelated)
+    }
+
     static let invalidCases: [InvalidManifestCase] = [
         .init(label: "no manifest", manifest: nil, files: [], expectedMessage: "Missing wallpaper.json"),
         .init(label: "bad JSON", manifest: "{ name: ", files: [], expectedMessage: "not valid JSON"),
@@ -138,6 +156,7 @@ struct WallpaperManifestTests {
         .init(label: "image on video", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "image": "a.png" }"#, files: ["a.mp4", "a.png"], expectedMessage: #""image" only works for metal"#),
         .init(label: "image not found", manifest: #"{ "name": "A", "type": "metal", "source": "a.metal", "image": "a.png" }"#, files: ["a.metal"], expectedMessage: #"Image file "a.png" not found"#),
         .init(label: "image not a picture", manifest: #"{ "name": "A", "type": "metal", "source": "a.metal", "image": "a.txt" }"#, files: ["a.metal", "a.txt"], expectedMessage: "png, jpg, or heic"),
+        .init(label: "pixelated on video", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "pixelated": true }"#, files: ["a.mp4"], expectedMessage: #""pixelated" only works for metal"#),
         .init(label: "volume wrong type", manifest: #"{ "name": "A", "type": "video", "source": "a.mp4", "volume": "loud" }"#, files: ["a.mp4"], expectedMessage: #""volume" has the wrong type"#),
     ]
 

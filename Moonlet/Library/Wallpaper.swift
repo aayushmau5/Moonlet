@@ -26,6 +26,7 @@ struct Wallpaper: Identifiable, Equatable, Sendable {
     let folder: URL
     var renderScale: Double = 1
     var image: URL?
+    var pixelated = false
 
     var location: String {
         "wallpapers/\(id)"
@@ -39,6 +40,7 @@ struct Wallpaper: Identifiable, Equatable, Sendable {
             && volume == other.volume
             && renderScale == other.renderScale
             && image == other.image
+            && pixelated == other.pixelated
     }
 }
 

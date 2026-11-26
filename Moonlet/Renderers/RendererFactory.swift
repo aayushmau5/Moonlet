@@ -17,7 +17,8 @@ enum RendererFactory {
                 sourceURL: url,
                 device: device,
                 renderScale: wallpaper.renderScale,
-                imageURL: wallpaper.image
+                imageURL: wallpaper.image,
+                pixelated: wallpaper.pixelated
             )
         case (.web, let source):
             return WebRenderer(source: source, folder: wallpaper.folder)
