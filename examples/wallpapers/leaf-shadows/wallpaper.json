@@ -1,0 +1,7 @@
+{
+  "name": "Leaf Shadows",
+  "type": "metal",
+  "source": "leaf-shadows.metal",
+  "renderScale": 0.5,
+  "pixelated": true
+}
