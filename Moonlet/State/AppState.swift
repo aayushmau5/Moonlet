@@ -14,6 +14,7 @@ final class AppState {
     static let selectedWallpaperKey = "selectedWallpaperID"
     static let selectedPackKey = "selectedPackID"
     static let wallpaperPausedKey = "wallpaperPaused"
+    static let pausesInLowPowerModeKey = "pausesInLowPowerMode"
 
     let library: Library
     private(set) var selectedWallpaperID: String?
@@ -21,8 +22,12 @@ final class AppState {
     private(set) var isWallpaperUserPaused: Bool
     private(set) var coveredDisplays: Set<CGDirectDisplayID> = []
     private(set) var isCoverOverridden = false
+    private(set) var pausesInLowPowerMode: Bool
+    private(set) var isLowPowerMode = false
+    private(set) var isLowPowerOverridden = false
 
     @ObservationIgnored var onWallpaperPauseChange: (() -> Void)?
+    @ObservationIgnored var onAutoPauseChange: (() -> Void)?
 
     @ObservationIgnored let scheduler: PackScheduler
     @ObservationIgnored private let switcher: WallpaperSwitching
@@ -47,6 +52,7 @@ final class AppState {
         self.selectedWallpaperID = defaults.string(forKey: Self.selectedWallpaperKey)
         self.selectedPackID = defaults.string(forKey: Self.selectedPackKey)
         self.isWallpaperUserPaused = defaults.bool(forKey: Self.wallpaperPausedKey)
+        self.pausesInLowPowerMode = defaults.object(forKey: Self.pausesInLowPowerModeKey) as? Bool ?? true
     }
 
     var problems: [Problem] {
@@ -79,7 +85,11 @@ final class AppState {
     }
 
     var isWallpaperPaused: Bool {
-        isWallpaperUserPaused || isCoverPausing
+        isWallpaperUserPaused || isCoverPausing || isLowPowerPausing
+    }
+
+    var isLowPowerPausing: Bool {
+        pausesInLowPowerMode && isLowPowerMode && !isLowPowerOverridden
     }
 
     var pausedCoveredDisplays: Set<CGDirectDisplayID> {
@@ -96,6 +106,9 @@ final class AppState {
             if isCoverPausing {
                 isCoverOverridden = true
             }
+            if isLowPowerPausing {
+                isLowPowerOverridden = true
+            }
         } else {
             isWallpaperUserPaused = true
         }
@@ -108,6 +121,21 @@ final class AppState {
             isCoverOverridden = false
         }
         coveredDisplays = displays
+    }
+
+    func setLowPowerMode(_ enabled: Bool) {
+        if !enabled {
+            isLowPowerOverridden = false
+        }
+        isLowPowerMode = enabled
+        onAutoPauseChange?()
+    }
+
+    func setPausesInLowPowerMode(_ enabled: Bool) {
+        pausesInLowPowerMode = enabled
+        isLowPowerOverridden = false
+        defaults.set(enabled, forKey: Self.pausesInLowPowerModeKey)
+        onAutoPauseChange?()
     }
 
     func moveLibrary(to folder: URL) {

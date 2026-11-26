@@ -26,6 +26,16 @@ struct GeneralTab: View {
                 }
             }
 
+            Section("Playback") {
+                Toggle("Pause live wallpaper in Low Power Mode", isOn: Binding(
+                    get: { appState.pausesInLowPowerMode },
+                    set: { appState.setPausesInLowPowerMode($0) }
+                ))
+                Text("Moonlet shows a still frame while Low Power Mode is on. Press Play in the menu to resume anyway.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Library") {
                 LabeledContent("Folder") {
                     Text(displayPath)

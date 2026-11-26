@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let switcher: WallpaperSwitcher
     private let otherAudio = OtherAudioDetector(monitor: PlaybackMonitor(ignoredBundleIDs: PlaybackMonitor.savedIgnoreList()))
     private let system = SystemMonitor()
+    private let lowPower = LowPowerMonitor()
     private var visibility: VisibilityMonitor?
     private let desktopPicture = DesktopPicture()
     private var stillTask: Task<Void, Never>?
@@ -58,6 +59,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        appState.onAutoPauseChange = { [weak self] in
+            self?.updateVisualPause()
+            self?.captureStillsOnPausedScreens()
+        }
+        lowPower.onChange = { [weak self] enabled in
+            self?.appState.setLowPowerMode(enabled)
+        }
         system.addChangeHandler { [audio] text in
             audio.setSystemPause(text)
         }
@@ -84,11 +92,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startMusicWithoutWaitingIfNeeded()
         otherAudio.start()
         system.start()
+        lowPower.start()
         visibility.start()
     }
 
     private func updateVisualPause() {
-        let paused = isSystemPaused ? Set(desktop.windows.keys) : appState.pausedCoveredDisplays
+        let pausesEveryScreen = isSystemPaused || appState.isLowPowerPausing
+        let paused = pausesEveryScreen ? Set(desktop.windows.keys) : appState.pausedCoveredDisplays
         desktop.setPausedDisplays(paused)
         desktop.setWallpaperPaused(appState.isWallpaperUserPaused)
     }
