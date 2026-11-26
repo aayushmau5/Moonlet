@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -12,10 +13,16 @@ struct WallpaperRemovalError: LocalizedError {
 final class AppState {
     static let selectedWallpaperKey = "selectedWallpaperID"
     static let selectedPackKey = "selectedPackID"
+    static let wallpaperPausedKey = "wallpaperPaused"
 
     let library: Library
     private(set) var selectedWallpaperID: String?
     private(set) var selectedPackID: String?
+    private(set) var isWallpaperUserPaused: Bool
+    private(set) var coveredDisplays: Set<CGDirectDisplayID> = []
+    private(set) var isCoverOverridden = false
+
+    @ObservationIgnored var onWallpaperPauseChange: (() -> Void)?
 
     @ObservationIgnored let scheduler: PackScheduler
     @ObservationIgnored private let switcher: WallpaperSwitching
@@ -39,6 +46,7 @@ final class AppState {
         self.removeItem = removeItem
         self.selectedWallpaperID = defaults.string(forKey: Self.selectedWallpaperKey)
         self.selectedPackID = defaults.string(forKey: Self.selectedPackKey)
+        self.isWallpaperUserPaused = defaults.bool(forKey: Self.wallpaperPausedKey)
     }
 
     var problems: [Problem] {
@@ -68,6 +76,38 @@ final class AppState {
         stopPack()
         remember(id)
         switcher.switchTo(wallpaper)
+    }
+
+    var isWallpaperPaused: Bool {
+        isWallpaperUserPaused || isCoverPausing
+    }
+
+    var pausedCoveredDisplays: Set<CGDirectDisplayID> {
+        isCoverOverridden ? [] : coveredDisplays
+    }
+
+    private var isCoverPausing: Bool {
+        !coveredDisplays.isEmpty && !isCoverOverridden
+    }
+
+    func toggleWallpaperPause() {
+        if isWallpaperPaused {
+            isWallpaperUserPaused = false
+            if isCoverPausing {
+                isCoverOverridden = true
+            }
+        } else {
+            isWallpaperUserPaused = true
+        }
+        defaults.set(isWallpaperUserPaused, forKey: Self.wallpaperPausedKey)
+        onWallpaperPauseChange?()
+    }
+
+    func setCoveredDisplays(_ displays: Set<CGDirectDisplayID>) {
+        if displays.isEmpty {
+            isCoverOverridden = false
+        }
+        coveredDisplays = displays
     }
 
     func moveLibrary(to folder: URL) {

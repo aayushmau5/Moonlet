@@ -55,6 +55,7 @@ final class FakeRenderer: WallpaperRenderer {
     }
 
     func waitUntilReady() async {}
+    func still(on displayID: CGDirectDisplayID) async -> CGImage? { nil }
     func play() { isPlaying = true }
     func pause() { isPlaying = false }
     func tearDown() { isTornDown = true }

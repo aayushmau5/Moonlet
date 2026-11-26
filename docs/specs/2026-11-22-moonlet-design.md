@@ -73,7 +73,8 @@ owns the desktop windows.
 Rejected alternatives:
 
 - Calling `NSWorkspace.setDesktopImageURL` repeatedly: cannot play smooth video
-  or shaders.
+  or shaders. Moonlet still sets a single still this way, so Mission Control
+  matches the wallpaper (section 7.9).
 - Hooking the system Aerial wallpaper extension: private API, breaks between
   macOS releases, video only.
 
@@ -95,7 +96,8 @@ other directly.
 | `AppShell` | SwiftUI `App`. `LSUIElement` is set, so there is no Dock icon. Hosts the `MenuBarExtra` and the settings window. Registers launch at login with `SMAppService.mainApp`. |
 | `AppState` | Holds the current wallpaper or pack, the music selection, the volume, and the two pause-reason sets: music and visuals. Persists state to `UserDefaults`. Main actor. |
 | `DesktopWindowController` | Owns one desktop-level window per `NSScreen`. Rebuilds the windows on `NSApplication.didChangeScreenParametersNotification`. |
-| `WallpaperRenderer` | Protocol with `load`, `play`, `pause`, and `tearDown`. Implemented by `VideoRenderer`, `MetalRenderer`, and `WebRenderer`. |
+| `WallpaperRenderer` | Protocol with `load`, `play`, `pause`, `still`, and `tearDown`. Implemented by `VideoRenderer`, `MetalRenderer`, and `WebRenderer`. |
+| `DesktopPicture` | Saves stills of the wallpaper and sets them as the macOS desktop picture, so Mission Control shows the wallpaper. |
 | `Library` | Scans the library folder, parses manifests, watches for file changes with FSEvents, and performs imports. |
 | `Scheduler` | Runs the active pack. Tells `AppState` which wallpaper to show next. |
 | `AudioController` | Applies the audio rule. Plays playlists with `AVQueuePlayer`, streams with `AVPlayer`, and soundtracks with `AVQueuePlayer` plus `AVPlayerLooper`. Handles fades. |
@@ -403,6 +405,13 @@ Visuals render only when the visual pause-reason set for a screen is empty.
 |---|---|---|
 | `covered` | The screen's wallpaper has been covered for 1 continuous second | Any part becomes visible. Resume is immediate. |
 | `system` | The screen locks, the display sleeps, or the Mac sleeps | Unlock or wake |
+| `user` | The user presses Pause in the menu panel | The user presses Play |
+
+- Pressing Play while `covered` is set overrides it until no screen is covered.
+  The next time a window covers the screen, `covered` applies again. This
+  mirrors the music override in section 6.4.
+- A `user` pause is persisted across launches.
+- Section 7.8 describes what a `user` pause does.
 
 Granularity:
 
@@ -503,10 +512,61 @@ it, so a new shader can be fixed by saving again without re-picking it.
 On launch, Moonlet restores:
 
 - the last wallpaper or pack
+- the `user` wallpaper pause, if it was set when Moonlet quit
 - the music selection
 - the volume
 - the shuffle setting
 - the `user` music pause, if it was set when Moonlet quit
+
+### 7.8 User pause
+
+A `user` pause freezes the wallpaper and frees its renderer, so a paused
+wallpaper uses no CPU or GPU for drawing.
+
+1. The renderer pauses, and Moonlet captures a still of each screen.
+2. Moonlet sets the still as the desktop window's layer contents, fades the
+   renderer view out over 0.6 seconds, and tears the renderer down.
+3. Moonlet sets the same still as the macOS desktop picture (section 7.9).
+
+The desktop window stays on screen and shows the still. Hiding the window and
+letting the macOS picture show through was tried and rejected:
+
+- macOS sets the picture for the current Space only. Other Spaces showed an
+  older picture until visited.
+- macOS crossfades a new picture for about 1.5 seconds. Fading Moonlet out
+  during that time showed a black frame.
+
+Switching wallpapers while paused loads the new renderer with its view
+hidden, captures its first frame, and crossfades the stills. The new
+wallpaper never plays.
+
+Play loads the current wallpaper again and crossfades it in, as a switch
+does. It starts from the beginning, not from the frozen frame.
+
+### 7.9 Desktop picture
+
+Mission Control shows the macOS desktop picture, not Moonlet's window. So
+Moonlet sets a still of the wallpaper as the macOS picture with
+`NSWorkspace.setDesktopImageURL`.
+
+- **When.** On a `user` pause, and when a wallpaper shows while paused, the
+  still is set at once. When a wallpaper shows while playing, Moonlet waits
+  until the screen is paused for `covered` or `system`. Capturing a full-size
+  still while the wallpaper was visible dropped 2 to 3 frames.
+- **Spaces.** The call only changes the current Space. Moonlet sets the
+  latest still again on `NSWorkspace.activeSpaceDidChangeNotification`.
+- **Capture.** Metal renders one frame offscreen and reads it back off the
+  main thread. Video uses `AVAssetImageGenerator` at the current time. Web
+  uses `WKWebView.takeSnapshot`.
+- **Files.** Stills are JPEGs in `~/Library/Application Support/Moonlet/Stills`,
+  each with a new name. macOS ignores a set with the same file name, and
+  replacing a file under a name a Space uses showed black.
+- **Cleanup.** Moonlet keeps the 2 newest stills per screen and any still named
+  in macOS's wallpaper store (`com.apple.wallpaper/Store/Index.plist`). It
+  only reads that file, and only searches it for still file names. A Space
+  pointing at a deleted still showed black. If the store can't be read,
+  Moonlet keeps the 20 newest.
+- **Quit.** The last still stays as the macOS picture.
 
 ## 8. User interface
 
@@ -518,6 +578,8 @@ volume slider. It contains:
 
 - Current wallpaper or pack name
 - Wallpaper picker: wallpapers and packs, grouped
+- Wallpaper Pause/Play button next to the section label. It shows Play while
+  the wallpaper is paused by the user or by `covered`.
 - Music: play/pause, the current track or stream name, and the pause reason
   when paused
 - Music selection picker: playlists and streams, plus a shuffle toggle

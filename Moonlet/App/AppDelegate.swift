@@ -12,7 +12,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let otherAudio = OtherAudioDetector(monitor: PlaybackMonitor(ignoredBundleIDs: PlaybackMonitor.savedIgnoreList()))
     private let system = SystemMonitor()
     private var visibility: VisibilityMonitor?
-    private var coveredDisplays: Set<CGDirectDisplayID> = []
+    private let desktopPicture = DesktopPicture()
+    private var stillTask: Task<Void, Never>?
+    private var coveredStillTask: Task<Void, Never>?
+    private var screensNeedingStill: Set<CGDirectDisplayID> = []
     private var isSystemPaused = false
 
     override init() {
@@ -29,8 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isRunningTests else { return }
 
-        switcher.onShown = { [audio] wallpaper in
+        switcher.onShown = { [weak self, audio] wallpaper in
             audio.wallpaperShown(wallpaper)
+            self?.wallpaperShown()
         }
         appState.library.addChangeHandler { [audio] in
             audio.libraryChanged()
@@ -41,24 +45,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ignoreList.onChange = { [otherAudio] bundleIDs in
             otherAudio.setIgnoredBundleIDs(bundleIDs)
         }
+        appState.onWallpaperPauseChange = { [weak self] in
+            guard let self else { return }
+            updateVisualPause()
+            if appState.isWallpaperUserPaused {
+                updateDesktopPicture()
+            } else {
+                stillTask?.cancel()
+                screensNeedingStill = Set(desktop.windows.keys)
+                if desktop.isParked {
+                    switcher.replay()
+                }
+            }
+        }
         system.addChangeHandler { [audio] text in
             audio.setSystemPause(text)
         }
         system.addChangeHandler { [weak self] text in
             self?.isSystemPaused = text != nil
             self?.updateVisualPause()
+            self?.captureStillsOnPausedScreens()
         }
         let visibility = VisibilityMonitor(displayProvider: SystemDisplayProvider()) { [desktop] displayID in
             guard let window = desktop.windows[displayID] else { return false }
             return !window.occlusionState.contains(.visible)
         }
         visibility.onChange = { [weak self] covered in
-            self?.coveredDisplays = covered
+            self?.appState.setCoveredDisplays(covered)
             self?.updateVisualPause()
+            self?.captureStillsOnPausedScreens()
         }
         self.visibility = visibility
 
+        desktop.setWallpaperPaused(appState.isWallpaperUserPaused)
         desktop.start()
+        desktopPicture.start()
         appState.start()
         startMusicWithoutWaitingIfNeeded()
         otherAudio.start()
@@ -67,12 +88,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateVisualPause() {
-        let paused = isSystemPaused ? Set(desktop.windows.keys) : coveredDisplays
+        let paused = isSystemPaused ? Set(desktop.windows.keys) : appState.pausedCoveredDisplays
         desktop.setPausedDisplays(paused)
+        desktop.setWallpaperPaused(appState.isWallpaperUserPaused)
+    }
+
+    private func wallpaperShown() {
+        if appState.isWallpaperUserPaused || desktop.isParked {
+            updateDesktopPicture()
+        } else {
+            screensNeedingStill = Set(desktop.windows.keys)
+            captureStillsOnPausedScreens()
+        }
+    }
+
+    private func captureStillsOnPausedScreens() {
+        let ready = screensNeedingStill.intersection(desktop.pausedDisplays)
+        guard !ready.isEmpty, !appState.isWallpaperUserPaused else { return }
+        screensNeedingStill.subtract(ready)
+        coveredStillTask = Task { [weak self, previous = coveredStillTask] in
+            await previous?.value
+            guard let self, !Task.isCancelled else { return }
+            let stills = await desktop.stills(on: ready)
+            guard !Task.isCancelled else { return }
+            await desktopPicture.show(stills)
+        }
+    }
+
+    private func updateDesktopPicture() {
+        screensNeedingStill.removeAll()
+        coveredStillTask?.cancel()
+        stillTask?.cancel()
+        stillTask = Task { [weak self] in
+            guard let self else { return }
+            let stills = await desktop.stills()
+            guard !Task.isCancelled else { return }
+            await desktopPicture.show(stills)
+            guard !Task.isCancelled else { return }
+            let hasEveryScreen = !stills.isEmpty && stills.count == desktop.windows.count
+            guard appState.isWallpaperUserPaused, hasEveryScreen else { return }
+            await desktop.park(showing: stills, duration: 0.6)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         appState.library.stopWatching()
+        desktopPicture.stop()
         desktop.closeAll()
     }
 

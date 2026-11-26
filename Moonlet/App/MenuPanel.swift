@@ -94,7 +94,11 @@ private struct WallpaperSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionLabel(text: "Wallpaper")
+            HStack {
+                SectionLabel(text: "Wallpaper")
+                Spacer()
+                pauseButton
+            }
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     choices
@@ -111,6 +115,20 @@ private struct WallpaperSection: View {
                 }
             }
         }
+    }
+
+    private var pauseButton: some View {
+        let isPaused = appState.isWallpaperPaused
+        return Button {
+            appState.toggleWallpaperPause()
+        } label: {
+            Label(isPaused ? "Play" : "Pause", systemImage: isPaused ? "play.fill" : "pause.fill")
+                .font(.caption)
+        }
+        .buttonStyle(HoverButtonStyle())
+        .padding(.vertical, -4)
+        .padding(.trailing, -8)
+        .help(isPaused ? "Play wallpaper" : "Pause wallpaper")
     }
 
     private var choices: some View {

@@ -96,6 +96,15 @@ final class WebRenderer: NSObject, WallpaperRenderer {
         }
     }
 
+    func still(on displayID: CGDirectDisplayID) async -> CGImage? {
+        guard let view = views[displayID] else { return nil }
+        let wasHidden = view.isHidden
+        view.isHidden = false
+        defer { view.isHidden = wasHidden }
+        let image = try? await view.takeSnapshot(configuration: nil)
+        return image?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
     func tearDown() {
         watcher?.stop()
         watcher = nil

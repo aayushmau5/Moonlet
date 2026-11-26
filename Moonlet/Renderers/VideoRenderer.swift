@@ -85,6 +85,15 @@ final class VideoRenderer: WallpaperRenderer {
         }
     }
 
+    func still(on displayID: CGDirectDisplayID) async -> CGImage? {
+        guard views[displayID] != nil, let asset = player.currentItem?.asset else { return nil }
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        return try? await generator.image(at: player.currentTime()).image
+    }
+
     func tearDown() {
         wantsToRun = false
         isRunning = false

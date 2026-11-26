@@ -50,6 +50,12 @@ final class WallpaperSwitcher: WallpaperSwitching {
         return task
     }
 
+    @discardableResult
+    func replay() -> Task<Void, Never>? {
+        guard let wallpaper = requested ?? current else { return nil }
+        return switchTo(wallpaper)
+    }
+
     private func perform(_ wallpaper: Wallpaper) async {
         guard let renderer = makeRenderer(wallpaper) else {
             fail(wallpaper, message: "\(wallpaper.kind.rawValue.capitalized) wallpapers are not supported yet")

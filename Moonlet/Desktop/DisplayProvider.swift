@@ -23,10 +23,12 @@ final class SystemDisplayProvider: DisplayProvider {
 
     var displays: [DisplayInfo] {
         NSScreen.screens.compactMap { screen in
-            guard let number = screen.deviceDescription[Self.screenNumberKey] as? NSNumber else {
-                return nil
-            }
-            return DisplayInfo(id: number.uint32Value, frame: screen.frame, visibleFrame: screen.visibleFrame)
+            guard let id = Self.displayID(of: screen) else { return nil }
+            return DisplayInfo(id: id, frame: screen.frame, visibleFrame: screen.visibleFrame)
         }
+    }
+
+    static func displayID(of screen: NSScreen) -> CGDirectDisplayID? {
+        (screen.deviceDescription[screenNumberKey] as? NSNumber)?.uint32Value
     }
 }

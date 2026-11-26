@@ -11,5 +11,6 @@ protocol WallpaperRenderer: AnyObject {
     func play()
     func pause()
     func setPausedDisplays(_ displays: Set<CGDirectDisplayID>)
+    func still(on displayID: CGDirectDisplayID) async -> CGImage?
     func tearDown()
 }

@@ -173,6 +173,23 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         }
     }
 
+    func still(on displayID: CGDirectDisplayID) async -> CGImage? {
+        guard let view = views[displayID] else { return nil }
+        let size = view.drawableSize
+        guard size.width > 0, size.height > 0,
+              let (buffer, texture) = try? encodeSnapshot(
+                  width: Int(size.width),
+                  height: Int(size.height),
+                  time: Float(clock.elapsed(at: .now))
+              ) else { return nil }
+        return await withCheckedContinuation { continuation in
+            buffer.addCompletedHandler { _ in
+                continuation.resume(returning: try? Self.makeImage(from: texture))
+            }
+            buffer.commit()
+        }
+    }
+
     func tearDown() {
         watcher?.stop()
         watcher = nil
@@ -185,6 +202,13 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     }
 
     func snapshot(width: Int, height: Int, time: Float) throws -> CGImage {
+        let (buffer, texture) = try encodeSnapshot(width: width, height: height, time: time)
+        buffer.commit()
+        buffer.waitUntilCompleted()
+        return try Self.makeImage(from: texture)
+    }
+
+    private func encodeSnapshot(width: Int, height: Int, time: Float) throws -> (MTLCommandBuffer, MTLTexture) {
         guard let pipeline, let commandQueue else {
             throw ShaderError(message: "Shader is not loaded")
         }
@@ -204,10 +228,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         pass.colorAttachments[0].storeAction = .store
         var uniforms = ShaderUniforms(time: time, resolution: SIMD2(Float(width), Float(height)))
         encode(into: buffer, pass: pass, pipeline: pipeline, uniforms: &uniforms)
-        buffer.commit()
-        buffer.waitUntilCompleted()
-
-        return try makeImage(from: texture)
+        return (buffer, texture)
     }
 
     private func readSource() throws -> String {
@@ -261,7 +282,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         encoder.endEncoding()
     }
 
-    private func makeImage(from texture: MTLTexture) throws -> CGImage {
+    nonisolated private static func makeImage(from texture: MTLTexture) throws -> CGImage {
         let bytesPerRow = texture.width * 4
         var bytes = [UInt8](repeating: 0, count: bytesPerRow * texture.height)
         texture.getBytes(
